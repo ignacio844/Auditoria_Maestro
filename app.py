@@ -37,11 +37,14 @@ st.markdown("""
         border-radius: 6px !important;
     }
     
-    /* Botones primarios */
+    /* Botones primarios (Más altos y profesionales) */
     button[kind="primary"], button[kind="primaryFormSubmit"] {
         background-color: #0D6EFD !important;
         border-color: #0D6EFD !important;
         color: white !important;
+        padding: 0.6rem 1rem !important; 
+        font-weight: 600 !important;
+        font-size: 1.05rem !important;
     }
     button[kind="primary"]:hover, button[kind="primaryFormSubmit"]:hover {
         background-color: #0b5ed7 !important;
@@ -60,7 +63,7 @@ st.markdown("""
         background-color: rgba(13, 110, 253, 0.02);
     }
 
-    /* Tarjetas Contenedoras de Gráficos (Redondeadas & Translúcidas) */
+    /* Tarjetas Contenedoras de Gráficos */
     div[data-testid="stPlotlyChart"] {
         background-color: rgba(30, 41, 59, 0.4) !important;
         border: 1px solid rgba(13, 110, 253, 0.2) !important;
@@ -68,7 +71,7 @@ st.markdown("""
         padding: 0.8rem !important;
     }
 
-    /* Tarjeta Destacada Posición */
+    /* Tarjeta Destacada Posición Semanal */
     .posicion-card {
         background-color: rgba(13, 110, 253, 0.06);
         border: 2px solid #0D6EFD;
@@ -89,6 +92,34 @@ st.markdown("""
         font-weight: 800;
     }
 
+    /* Tarjetas de Métricas de Recuento (Azul Oscuro p/ Modo Claro) */
+    .metric-card-dark {
+        background-color: #0f172a;
+        border: 1px solid #1e293b;
+        border-radius: 10px;
+        padding: 1.2rem 1rem;
+        text-align: center;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+    .metric-card-dark-label {
+        font-size: 0.85rem;
+        color: #cbd5e1;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 0.3rem;
+    }
+    .metric-card-dark-val {
+        font-size: 2.2rem;
+        color: #38bdf8;
+        font-weight: 800;
+        line-height: 1.1;
+    }
+
     /* TARJETAS KPI RESUMEN CONSOLIDADO */
     .dash-kpi-grey {
         background-color: rgba(255, 255, 255, 0.03);
@@ -106,8 +137,6 @@ st.markdown("""
         text-align: center;
         color: #e2e8f0;
     }
-    
-    /* ERI CONDICIONALES (Borde intenso + Fondo soft transparente) */
     .kpi-eri-green {
         background-color: rgba(16, 185, 129, 0.12) !important;
         border: 2px solid #10b981 !important;
@@ -132,7 +161,6 @@ st.markdown("""
         padding: 0.8rem;
         text-align: center;
     }
-
     .dash-kpi-label {
         font-size: 0.8rem;
         font-weight: 700;
@@ -160,23 +188,17 @@ def parse_posicion_completa(p):
         return nivel, seccion, modulo, pos_base, p_clean
     return "Otros", "Otros", "Otros", p_clean, p_clean
 
-# Carga de la base consolidada (Búsqueda resistente a tildes y mayúsculas en Linux)
+# Carga de la base consolidada
 @st.cache_data
 def cargar_base_consolidada():
-    import os
-    # Obtenemos todos los archivos CSV de la carpeta
-    archivos_csv = glob.glob("*.csv")
-    
-    # Buscamos alguno que tenga "consolidada" en el nombre (ignorando mayúsculas y tildes)
-    for archivo in archivos_csv:
-        if "consolidada" in archivo.lower():
-            return pd.read_csv(archivo)
-            
-    # Fallback de seguridad
+    archivos = glob.glob("*Base_de_Datos_Consolidada*.csv")
+    if archivos:
+        return pd.read_csv(archivos[0])
     try:
         return pd.read_csv("Base_de_Datos_Consolidada_Auditorías_de_Productos_V4.csv")
     except FileNotFoundError:
         return None
+
 # ---------------------------------------------------------
 # FUNCIÓN EMERGENTE: RUTA DE AUDITORÍA (SNAKE PATH)
 # ---------------------------------------------------------
@@ -426,7 +448,6 @@ if seccion_activa == "Resumen Consolidado":
             
             c_graf1, c_graf2 = st.columns(2)
             
-            # --- GRÁFICO 1: EVOLUCIÓN ERI ---
             with c_graf1:
                 df_dash['Semana_Num'] = df_dash['Nombre del Archivo Origen'].str.extract(r'(\d+)').astype(float)
                 df_sem = df_dash.groupby(['Nombre del Archivo Origen', 'Semana_Num']).apply(
@@ -459,15 +480,15 @@ if seccion_activa == "Resumen Consolidado":
                 ))
                 
                 fig_line.update_layout(
-                    title="",  # Elimina el "undefined"
+                    title="",  
                     paper_bgcolor='rgba(0,0,0,0)',
                     plot_bgcolor='rgba(0,0,0,0)',
                     font=dict(color='#e2e8f0', size=11),
-                    height=340, # Altura homologada
+                    height=340, 
                     yaxis=dict(title="", range=[0, 105], ticksuffix="%", gridcolor='rgba(255,255,255,0.06)'),
                     xaxis=dict(gridcolor='rgba(255,255,255,0.06)', tickfont=dict(size=10, color='#cbd5e1')),
-                    margin=dict(l=20, r=20, t=30, b=45), # Margen inferior ampliado (b=45) para leer bien las semanas
-                    legend=dict(orientation="h", yanchor="bottom", y=1.0, xanchor="center", x=0.5, font=dict(size=10, color='#94a3b8')) # Leyenda centrada para no robar ancho
+                    margin=dict(l=20, r=20, t=30, b=45), 
+                    legend=dict(orientation="h", yanchor="bottom", y=1.0, xanchor="center", x=0.5, font=dict(size=10, color='#94a3b8')) 
                 )
                 
                 st.plotly_chart(
@@ -478,7 +499,6 @@ if seccion_activa == "Resumen Consolidado":
                     key="chart_linea_interactivo"
                 )
                 
-            # --- GRÁFICO 2: RESULTADO AUDITORÍAS ---
             with c_graf2:
                 df_obs = df_dash[df_dash['Observaciones'] != 'Sin observaciones']['Observaciones'].value_counts().reset_index()
                 df_obs.columns = ['Observacion', 'Cantidad']
@@ -505,17 +525,17 @@ if seccion_activa == "Resumen Consolidado":
                     custom_data=['Observacion']
                 )
                 fig_bar.update_traces(
-                    marker_color='#9a1031',  # Nuevo color rojo intenso
+                    marker_color='#9a1031',
                     textposition='outside',
                     textfont=dict(color='#f8fafc', size=11),
                     cliponaxis=False
                 )
                 fig_bar.update_layout(
-                    title="", # Elimina el "undefined"
+                    title="", 
                     paper_bgcolor='rgba(0,0,0,0)',
                     plot_bgcolor='rgba(0,0,0,0)',
                     font=dict(color='#e2e8f0', size=11),
-                    height=340, # Altura homologada con el gráfico izquierdo
+                    height=340, 
                     xaxis=dict(
                         title="", 
                         tickangle=0, 
@@ -527,7 +547,7 @@ if seccion_activa == "Resumen Consolidado":
                         range=[0, max_cant * 1.25], 
                         gridcolor='rgba(255,255,255,0.06)'
                     ),
-                    margin=dict(l=20, r=20, t=30, b=55) # Top margin idéntico (t=30) para igualar escalas
+                    margin=dict(l=20, r=20, t=30, b=55) 
                 )
                 
                 st.plotly_chart(
@@ -631,13 +651,7 @@ elif seccion_activa == "Auditoría Live":
 
         if not st.session_state['muestra_actual'].empty:
             st.markdown("---")
-            
-            col_tit, col_ruta = st.columns([3, 1])
-            with col_tit:
-                st.markdown("### Carga de Recuento Físico")
-            with col_ruta:
-                if st.button("Ver Ruta de Auditoría", type="secondary", use_container_width=True):
-                    mostrar_ruta_auditoria(st.session_state['muestra_actual'], col_posicion_inv, col_deposito_inv)
+            st.markdown("### Carga de Recuento Físico")
             
             df_recuento = st.session_state['muestra_actual'].copy()
             
@@ -650,11 +664,28 @@ elif seccion_activa == "Auditoría Live":
             columnas_existentes = [col for col in columnas_edicion if col in df_recuento.columns]
             df_recuento = df_recuento[columnas_existentes]
             
-            metric_col1, metric_col2, metric_col3 = st.columns(3)
-            metric_col1.metric("Posiciones a Auditar", len(df_recuento))
-            placeholder_pendientes = metric_col2.empty()
-            placeholder_diferencias = metric_col3.empty()
+            # --- NUEVA GRILLA DE MÉTRICAS Y BOTÓN RUTA ---
+            c_m1, c_m2, c_m3, c_btn = st.columns([1, 1, 1, 1.2])
             
+            with c_m1:
+                st.markdown(f"""
+                    <div class="metric-card-dark">
+                        <div class="metric-card-dark-label">Posiciones</div>
+                        <div class="metric-card-dark-val">{len(df_recuento)}</div>
+                    </div>
+                """, unsafe_allow_html=True)
+                
+            placeholder_pendientes = c_m2.empty()
+            placeholder_diferencias = c_m3.empty()
+            
+            with c_btn:
+                st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+                if st.button("🗺️ Calcular Ruta Óptima", type="primary", use_container_width=True):
+                    mostrar_ruta_auditoria(st.session_state['muestra_actual'], col_posicion_inv, col_deposito_inv)
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            # --- TABLA DE EDICIÓN ---
             df_editado = st.data_editor(
                 df_recuento,
                 column_config={
@@ -672,8 +703,26 @@ elif seccion_activa == "Auditoría Live":
                 key="editor_auditoria_prod"
             )
 
+            # --- CÁLCULOS DINÁMICOS PARA LAS TARJETAS ---
             faltan_cargar = df_editado['Stock auditado'].isna().sum()
-            placeholder_pendientes.metric("Cantidades Pendientes", faltan_cargar)
+            
+            placeholder_pendientes.markdown(f"""
+                <div class="metric-card-dark">
+                    <div class="metric-card-dark-label">Pendientes</div>
+                    <div class="metric-card-dark-val" style="color: {'#38bdf8' if faltan_cargar == 0 else '#facc15'};">{faltan_cargar}</div>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            st_teorico_temp = pd.to_numeric(df_editado[col_stock_inv], errors='coerce').fillna(0)
+            st_fisico_temp = pd.to_numeric(df_editado['Stock auditado'], errors='coerce')
+            dif_reales = ((st_fisico_temp.notna()) & (st_fisico_temp != st_teorico_temp)).sum()
+            
+            placeholder_diferencias.markdown(f"""
+                <div class="metric-card-dark">
+                    <div class="metric-card-dark-label">Diferencias</div>
+                    <div class="metric-card-dark-val" style="color: {'#10b981' if dif_reales == 0 else '#f87171'};">{dif_reales}</div>
+                </div>
+            """, unsafe_allow_html=True)
             
             if faltan_cargar > 0:
                 st.info(f"Falta ingresar el recuento físico de {faltan_cargar} posiciones para habilitar el reporte.")
@@ -693,9 +742,6 @@ elif seccion_activa == "Auditoría Live":
                         return "SOBRANTE"
                         
                 df_editado['Resultado'] = df_editado['Diferencia'].apply(evaluar_resultado)
-                
-                total_dif = (df_editado['Diferencia'] != 0).sum()
-                placeholder_diferencias.metric("Diferencias Detectadas", total_dif)
                 
                 categorias = df_editado['Cod Sku'].map(
                     df_base.set_index('Cod Sku')['Clasificación Valor']
