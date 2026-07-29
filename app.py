@@ -37,7 +37,7 @@ st.markdown("""
         border-radius: 6px !important;
     }
     
-    /* Botones primarios (Más altos, grandes y profesionales) */
+    /* Botones primarios (General) */
     button[kind="primary"], button[kind="primaryFormSubmit"] {
         background-color: #0D6EFD !important;
         border-color: #0D6EFD !important;
@@ -49,6 +49,13 @@ st.markdown("""
     button[kind="primary"]:hover, button[kind="primaryFormSubmit"]:hover {
         background-color: #0b5ed7 !important;
         border-color: #0a58ca !important;
+    }
+
+    /* BOTÓN ESPECÍFICO DE RUTA (Igualando altura de tarjetas) */
+    button[title="Calcula la ruta óptima para el recorrido"] {
+        height: 98px !important;
+        border-radius: 8px !important;
+        font-size: 1.15rem !important;
     }
     
     [data-testid="stForm"] {
@@ -63,7 +70,7 @@ st.markdown("""
         background-color: rgba(13, 110, 253, 0.02);
     }
 
-    /* Tarjetas Contenedoras de Gráficos (Redondeadas & Translúcidas) */
+    /* Tarjetas Contenedoras de Gráficos */
     div[data-testid="stPlotlyChart"] {
         background-color: rgba(30, 41, 59, 0.4) !important;
         border: 1px solid rgba(13, 110, 253, 0.2) !important;
@@ -92,30 +99,29 @@ st.markdown("""
         font-weight: 800;
     }
 
-    /* Tarjetas de Métricas de Recuento (Azul Oscuro p/ Modo Claro) */
-    .metric-card-dark {
-        background-color: #0f172a;
-        border: 1px solid #1e293b;
-        border-radius: 10px;
-        padding: 1.2rem 1rem;
+    /* Tarjetas Soft Blue (Métricas Auditoría) */
+    .metric-card-soft {
+        background-color: rgba(13, 110, 253, 0.05);
+        border: 1px solid rgba(13, 110, 253, 0.25);
+        border-radius: 8px;
+        padding: 1rem;
         text-align: center;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        height: 100%;
+        height: 98px; /* Altura fija para igualar al botón */
         display: flex;
         flex-direction: column;
         justify-content: center;
     }
-    .metric-card-dark-label {
-        font-size: 0.85rem;
+    .metric-card-soft-label {
+        font-size: 0.8rem;
         color: #cbd5e1;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        margin-bottom: 0.3rem;
+        margin-bottom: 0.2rem;
     }
-    .metric-card-dark-val {
-        font-size: 2.2rem;
-        color: #38bdf8;
+    .metric-card-soft-val {
+        font-size: 2rem;
+        color: #ffffff; /* Blanco limpio, sin colores condicionales */
         font-weight: 800;
         line-height: 1.1;
     }
@@ -137,7 +143,6 @@ st.markdown("""
         text-align: center;
         color: #e2e8f0;
     }
-    
     .kpi-eri-green {
         background-color: rgba(16, 185, 129, 0.12) !important;
         border: 2px solid #10b981 !important;
@@ -190,16 +195,22 @@ def parse_posicion_completa(p):
         return nivel, seccion, modulo, pos_base, p_clean
     return "Otros", "Otros", "Otros", p_clean, p_clean
 
-# Carga de la base consolidada
+# Carga de la base consolidada (BÚSQUEDA EXHAUSTIVA PARA LA NUBE)
 @st.cache_data
 def cargar_base_consolidada():
-    archivos_csv = glob.glob("*.csv")
-    for archivo in archivos_csv:
-        if "consolidada" in archivo.lower():
-            return pd.read_csv(archivo)
+    import os
+    # Buscar el archivo en cualquier carpeta dentro del repositorio
+    for root, dirs, files in os.walk("."):
+        for file in files:
+            if "consolidada" in file.lower() and file.lower().endswith(".csv"):
+                try:
+                    return pd.read_csv(os.path.join(root, file))
+                except Exception:
+                    continue
+    # Fallback por defecto
     try:
         return pd.read_csv("Base_de_Datos_Consolidada_Auditorías_de_Productos_V4.csv")
-    except FileNotFoundError:
+    except Exception:
         return None
 
 # ---------------------------------------------------------
@@ -326,13 +337,22 @@ archivos_auditoria = {
 
 @st.cache_data 
 def cargar_datos(ruta):
+    import os
+    # Búsqueda adaptativa para la base maestra (igual que la consolidada)
+    for root, dirs, files in os.walk("."):
+        for file in files:
+            if file.lower() == ruta.lower():
+                try:
+                    return pd.read_csv(os.path.join(root, file))
+                except Exception:
+                    continue
     return pd.read_csv(ruta)
 
 if seccion_activa == "Auditoría Live":
     try:
         df_base = cargar_datos(archivos_auditoria[tipo_auditoria])
     except FileNotFoundError:
-        st.error(f"No se encontró el archivo {archivos_auditoria[tipo_auditoria]}.")
+        st.error(f"No se encontró el archivo de base maestra para {tipo_auditoria} en tu repositorio.")
         st.stop()
 
 # ---------------------------------------------------------
@@ -366,7 +386,7 @@ if seccion_activa == "Resumen Consolidado":
     df_dash = cargar_base_consolidada()
     
     if df_dash is None:
-        st.error("No se encontró la base consolidada de productos en la carpeta. Verifique el archivo CSV.")
+        st.error("No se encontró la base consolidada en el repositorio. Asegúrate de haber subido el .csv")
     else:
         df_dash['Stock auditado'] = pd.to_numeric(df_dash['Stock auditado'], errors='coerce').fillna(0)
         df_dash['Stock Octosis'] = pd.to_numeric(df_dash['Stock Octosis'], errors='coerce').fillna(0)
@@ -451,7 +471,6 @@ if seccion_activa == "Resumen Consolidado":
             
             c_graf1, c_graf2 = st.columns(2)
             
-            # --- GRÁFICO 1: EVOLUCIÓN ERI ---
             with c_graf1:
                 df_dash['Semana_Num'] = df_dash['Nombre del Archivo Origen'].str.extract(r'(\d+)').astype(float)
                 df_sem = df_dash.groupby(['Nombre del Archivo Origen', 'Semana_Num']).apply(
@@ -503,7 +522,6 @@ if seccion_activa == "Resumen Consolidado":
                     key="chart_linea_interactivo"
                 )
                 
-            # --- GRÁFICO 2: RESULTADO AUDITORÍAS ---
             with c_graf2:
                 df_obs = df_dash[df_dash['Observaciones'] != 'Sin observaciones']['Observaciones'].value_counts().reset_index()
                 df_obs.columns = ['Observacion', 'Cantidad']
@@ -669,14 +687,14 @@ elif seccion_activa == "Auditoría Live":
             columnas_existentes = [col for col in columnas_edicion if col in df_recuento.columns]
             df_recuento = df_recuento[columnas_existentes]
             
-            # --- NUEVA GRILLA DE MÉTRICAS (TARJETAS OSCURAS) Y BOTÓN GIGANTE ---
+            # --- NUEVA GRILLA DE MÉTRICAS Y BOTÓN RUTA (ALTURAS IGUALADAS) ---
             c_m1, c_m2, c_m3, c_btn = st.columns([1, 1, 1, 1.3])
             
             with c_m1:
                 st.markdown(f"""
-                    <div class="metric-card-dark">
-                        <div class="metric-card-dark-label">Posiciones a Auditar</div>
-                        <div class="metric-card-dark-val">{len(df_recuento)}</div>
+                    <div class="metric-card-soft">
+                        <div class="metric-card-soft-label">Posiciones a Auditar</div>
+                        <div class="metric-card-soft-val">{len(df_recuento)}</div>
                     </div>
                 """, unsafe_allow_html=True)
                 
@@ -684,8 +702,8 @@ elif seccion_activa == "Auditoría Live":
             placeholder_diferencias = c_m3.empty()
             
             with c_btn:
-                st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-                if st.button("🗺️ Calcular Ruta Óptima", type="primary", use_container_width=True):
+                # El botón tiene un "help" específico que usamos en CSS para darle 98px de alto
+                if st.button("Calcular Ruta Óptima", type="primary", use_container_width=True, icon=":material/route:", help="Calcula la ruta óptima para el recorrido"):
                     mostrar_ruta_auditoria(st.session_state['muestra_actual'], col_posicion_inv, col_deposito_inv)
             
             st.markdown("<br>", unsafe_allow_html=True)
@@ -708,13 +726,13 @@ elif seccion_activa == "Auditoría Live":
                 key="editor_auditoria_prod"
             )
 
-            # --- CÁLCULOS DINÁMICOS PARA LAS TARJETAS ---
+            # --- CÁLCULOS DINÁMICOS PARA LAS TARJETAS BLANCAS ---
             faltan_cargar = df_editado['Stock auditado'].isna().sum()
             
             placeholder_pendientes.markdown(f"""
-                <div class="metric-card-dark">
-                    <div class="metric-card-dark-label">Pendientes</div>
-                    <div class="metric-card-dark-val" style="color: {'#38bdf8' if faltan_cargar == 0 else '#facc15'};">{faltan_cargar}</div>
+                <div class="metric-card-soft">
+                    <div class="metric-card-soft-label">Pendientes</div>
+                    <div class="metric-card-soft-val">{faltan_cargar}</div>
                 </div>
             """, unsafe_allow_html=True)
             
@@ -723,9 +741,9 @@ elif seccion_activa == "Auditoría Live":
             dif_reales = ((st_fisico_temp.notna()) & (st_fisico_temp != st_teorico_temp)).sum()
             
             placeholder_diferencias.markdown(f"""
-                <div class="metric-card-dark">
-                    <div class="metric-card-dark-label">Diferencias</div>
-                    <div class="metric-card-dark-val" style="color: {'#10b981' if dif_reales == 0 else '#f87171'};">{dif_reales}</div>
+                <div class="metric-card-soft">
+                    <div class="metric-card-soft-label">Diferencias</div>
+                    <div class="metric-card-soft-val">{dif_reales}</div>
                 </div>
             """, unsafe_allow_html=True)
             
