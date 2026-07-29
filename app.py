@@ -37,7 +37,7 @@ st.markdown("""
         border-radius: 6px !important;
     }
     
-    /* Botones primarios (General) */
+    /* Botones primarios */
     button[kind="primary"], button[kind="primaryFormSubmit"] {
         background-color: #0D6EFD !important;
         border-color: #0D6EFD !important;
@@ -51,7 +51,7 @@ st.markdown("""
         border-color: #0a58ca !important;
     }
 
-    /* BOTÓN ESPECÍFICO DE RUTA (Igualando altura de tarjetas) */
+    /* BOTÓN ESPECÍFICO DE RUTA */
     button[title="Calcula la ruta óptima para el recorrido"] {
         height: 98px !important;
         border-radius: 8px !important;
@@ -99,14 +99,14 @@ st.markdown("""
         font-weight: 800;
     }
 
-    /* Tarjetas Soft Blue (Métricas Auditoría) */
+    /* Tarjetas Soft Blue */
     .metric-card-soft {
         background-color: rgba(13, 110, 253, 0.05);
         border: 1px solid rgba(13, 110, 253, 0.25);
         border-radius: 8px;
         padding: 1rem;
         text-align: center;
-        height: 98px; /* Altura fija para igualar al botón */
+        height: 98px;
         display: flex;
         flex-direction: column;
         justify-content: center;
@@ -121,7 +121,7 @@ st.markdown("""
     }
     .metric-card-soft-val {
         font-size: 2rem;
-        color: #ffffff; /* Blanco limpio, sin colores condicionales */
+        color: #ffffff;
         font-weight: 800;
         line-height: 1.1;
     }
@@ -195,31 +195,27 @@ def parse_posicion_completa(p):
         return nivel, seccion, modulo, pos_base, p_clean
     return "Otros", "Otros", "Otros", p_clean, p_clean
 
-# Carga de la base consolidada (BÚSQUEDA EXHAUSTIVA PARA LA NUBE)
-@st.cache_data
-def cargar_base_consolidada():
-    import os
-    # Buscar el archivo en cualquier carpeta dentro del repositorio
+# Carga de la base consolidada
+def obtener_ruta_base_consolidada():
     for root, dirs, files in os.walk("."):
         for file in files:
             if "consolidada" in file.lower() and file.lower().endswith(".csv"):
-                try:
-                    return pd.read_csv(os.path.join(root, file))
-                except Exception:
-                    continue
-    # Fallback por defecto
-    try:
-        return pd.read_csv("Base_de_Datos_Consolidada_Auditorías_de_Productos_V4.csv")
-    except Exception:
-        return None
+                return os.path.join(root, file)
+    return "Base_de_Datos_Consolidada_Auditorías_de_Productos_V4.csv"
+
+@st.cache_data
+def cargar_base_consolidada():
+    ruta = obtener_ruta_base_consolidada()
+    if os.path.exists(ruta):
+        return pd.read_csv(ruta)
+    return None
 
 # ---------------------------------------------------------
-# FUNCIÓN EMERGENTE: RUTA DE AUDITORÍA (SNAKE PATH)
+# FUNCIÓN EMERGENTE 1: RUTA DE AUDITORÍA
 # ---------------------------------------------------------
 @st.dialog("Ruta Óptima de Auditoría", width="large")
 def mostrar_ruta_auditoria(df, col_pos, col_dep):
     st.write("Sigue este orden para minimizar tus pasos en el depósito. El sistema alterna el recorrido por cada nivel.")
-    
     df_ruta = df.copy()
     
     def obtener_nivel_seccion(pos):
@@ -238,12 +234,10 @@ def mostrar_ruta_auditoria(df, col_pos, col_dep):
     
     for nivel in niveles:
         df_nivel = df_ruta[df_ruta['Nivel_Temp'] == nivel]
-        
         if nivel == 999 or nivel % 2 != 0:
             df_nivel = df_nivel.sort_values(by=['Seccion_Temp'], ascending=True)
         else:
             df_nivel = df_nivel.sort_values(by=['Seccion_Temp'], ascending=False)
-            
         df_ordenado = pd.concat([df_ordenado, df_nivel])
         
     columnas_mostrar = ['Cod Sku', 'Descripcion', col_pos, col_dep]
@@ -255,6 +249,73 @@ def mostrar_ruta_auditoria(df, col_pos, col_dep):
     st.dataframe(df_ordenado[columnas_finales], hide_index=True, use_container_width=True)
     if st.button("Cerrar Ruta", use_container_width=True):
         st.rerun()
+
+# ---------------------------------------------------------
+# FUNCIÓN EMERGENTE 2: VALIDACIÓN E IMPACTO A BASE CONSOLIDADA
+# ---------------------------------------------------------
+@st.dialog("Confirmación e Impacto en Base Consolidada", width="large")
+def confirmar_e_impactar_consolidado(df_preparado):
+    st.write("Revisa los resultados obtenidos. Puedes corregir manualmente el **Resultado** (ej: marcar OK si la diferencia es tolerable) o las **Observaciones** antes de guardar.")
+    
+    # Identificar última semana registrada para sugerir la siguiente
+    semana_sugerida = "SEMANA 31"
+    df_actual_cons = cargar_base_consolidada()
+    if df_actual_cons is not None and 'Nombre del Archivo Origen' in df_actual_cons.columns:
+        semanas_existentes = df_actual_cons['Nombre del Archivo Origen'].unique().tolist()
+        if semanas_existentes:
+            semana_sugerida = semanas_existentes[-1]
+
+    semana_ingresada = st.text_input("Etiqueta de Semana / Identificador:", value=semana_sugerida)
+    
+    # Permitir edición previa a la inserción
+    df_validar = df_preparado.copy()
+    
+    df_confirmado = st.data_editor(
+        df_validar,
+        column_config={
+            "Categoría": st.column_config.TextColumn("Categoría", disabled=True),
+            "Código": st.column_config.TextColumn("Código SKU", disabled=True),
+            "Stock Octosis": st.column_config.NumberColumn("Stock Sistema", disabled=True),
+            "Stock auditado": st.column_config.NumberColumn("Stock Auditado", disabled=True),
+            "Diferencia": st.column_config.NumberColumn("Diferencia", disabled=True),
+            "Resultado": st.column_config.SelectboxColumn("Resultado Final", options=["OK", "KO", "FALTANTE", "SOBRANTE"], required=True),
+            "Observaciones": st.column_config.TextColumn("Observaciones / Motivo")
+        },
+        use_container_width=True,
+        hide_index=True,
+        key="editor_confirmacion_modal"
+    )
+    
+    c_modal1, c_modal2 = st.columns(2)
+    
+    with c_modal1:
+        if st.button("✅ Confirmar y Guardar en Base", type="primary", use_container_width=True):
+            df_confirmado["Nombre del Archivo Origen"] = semana_ingresada
+            
+            # Formatear columnas estándar de la base consolidada
+            cols_base = ['Nombre del Archivo Origen', 'Categoría', 'Código', 'Stock Octosis', 'Stock auditado', 'Diferencia', 'Resultado', 'Observaciones']
+            df_para_anexar = df_confirmado[[c for c in cols_base if c in df_confirmado.columns]]
+            
+            ruta_csv = obtener_ruta_base_consolidada()
+            
+            if os.path.exists(ruta_csv):
+                df_existente = pd.read_csv(ruta_csv)
+                df_final_actualizado = pd.concat([df_existente, df_para_anexar], ignore_index=True)
+            else:
+                df_final_actualizado = df_para_anexar
+                
+            # Guardado en disco
+            df_final_actualizado.to_csv(ruta_csv, index=False)
+            st.cache_data.clear() # Limpiar caché para refrescar el dashboard al instante
+            
+            # Resetear la muestra live
+            st.session_state['muestra_actual'] = pd.DataFrame()
+            st.success("¡Datos guardados e impactados con éxito en la Base Consolidada!")
+            st.rerun()
+            
+    with c_modal2:
+        if st.button("Cancelar", use_container_width=True):
+            st.rerun()
 
 # ---------------------------------------------------------
 # 1. BARRA LATERAL: NAVEGACIÓN Y CARGA DE INVENTARIO
@@ -337,8 +398,6 @@ archivos_auditoria = {
 
 @st.cache_data 
 def cargar_datos(ruta):
-    import os
-    # Búsqueda adaptativa para la base maestra (igual que la consolidada)
     for root, dirs, files in os.walk("."):
         for file in files:
             if file.lower() == ruta.lower():
@@ -687,7 +746,6 @@ elif seccion_activa == "Auditoría Live":
             columnas_existentes = [col for col in columnas_edicion if col in df_recuento.columns]
             df_recuento = df_recuento[columnas_existentes]
             
-            # --- NUEVA GRILLA DE MÉTRICAS Y BOTÓN RUTA (ALTURAS IGUALADAS) ---
             c_m1, c_m2, c_m3, c_btn = st.columns([1, 1, 1, 1.3])
             
             with c_m1:
@@ -702,13 +760,11 @@ elif seccion_activa == "Auditoría Live":
             placeholder_diferencias = c_m3.empty()
             
             with c_btn:
-                # El botón tiene un "help" específico que usamos en CSS para darle 98px de alto
                 if st.button("Calcular Ruta Óptima", type="primary", use_container_width=True, icon=":material/route:", help="Calcula la ruta óptima para el recorrido"):
                     mostrar_ruta_auditoria(st.session_state['muestra_actual'], col_posicion_inv, col_deposito_inv)
             
             st.markdown("<br>", unsafe_allow_html=True)
             
-            # --- TABLA DE EDICIÓN ---
             df_editado = st.data_editor(
                 df_recuento,
                 column_config={
@@ -726,7 +782,6 @@ elif seccion_activa == "Auditoría Live":
                 key="editor_auditoria_prod"
             )
 
-            # --- CÁLCULOS DINÁMICOS PARA LAS TARJETAS BLANCAS ---
             faltan_cargar = df_editado['Stock auditado'].isna().sum()
             
             placeholder_pendientes.markdown(f"""
@@ -770,42 +825,18 @@ elif seccion_activa == "Auditoría Live":
                     df_base.set_index('Cod Sku')['Clasificación Valor']
                 ).fillna("Sin Categoría")
 
-                df_reporte_final = pd.DataFrame({
-                    'Tipo de auditoria': tipo_auditoria,
+                df_preparado = pd.DataFrame({
                     'Categoría': categorias,
                     'Código': df_editado['Cod Sku'],
-                    'Stock Sistema': stock_teorico,
+                    'Stock Octosis': stock_teorico,
                     'Stock auditado': stock_fisico,
                     'Diferencia': df_editado['Diferencia'],
                     'Resultado': df_editado['Resultado'],
                     'Observaciones': df_editado['Observaciones']
                 })
                 
-                def resaltar_filas(row):
-                    if row['Resultado'] == 'FALTANTE':
-                        return ['background-color: #ffebee; color: #b71c1c'] * len(row)
-                    elif row['Resultado'] == 'SOBRANTE':
-                        return ['background-color: #fff8e1; color: #f57f17'] * len(row)
-                    else:
-                        return ['background-color: #e8f5e9; color: #1b5e20'] * len(row)
-
-                df_estilizado = df_reporte_final.style.apply(resaltar_filas, axis=1)
-                
-                st.markdown("### Reporte Final de Auditoría")
-                st.dataframe(df_estilizado, use_container_width=True, hide_index=True)
-                
-                csv = df_reporte_final.to_csv(index=False, sep=';', decimal=',')
-                fecha_hoy = datetime.datetime.now().strftime("%d-%m")
-                
-                col_down1, col_down2 = st.columns([1, 4])
-                with col_down1:
-                    st.download_button(
-                        label="Descargar Reporte (.csv)",
-                        data=csv,
-                        file_name=f"REG-AUD-PROD-{fecha_hoy}.csv",
-                        mime="text/csv",
-                        use_container_width=True
-                    )
+                # Desplegar la ventana modal emergente de confirmación
+                confirmar_e_impactar_consolidado(df_preparado)
 
     elif tipo_auditoria == "Posiciones":
         
@@ -913,36 +944,16 @@ elif seccion_activa == "Auditoría Live":
                         )
                         
                         df_rep_pos = pd.DataFrame({
-                            'Tipo de auditoria': "POSICIONES",
-                            'Posición Módulo': pos_actual,
-                            'Posición Específica': df_editor_pos['Estanteria_Clean'],
+                            'Categoría': "Posiciones",
                             'Código': df_editor_pos['Código'],
-                            'Stock Sistema': st_teorico,
+                            'Stock Octosis': st_teorico,
                             'Stock auditado': st_fisico,
                             'Diferencia': df_editor_pos['Diferencia'],
                             'Resultado': df_editor_pos['Resultado'],
                             'Observaciones': df_editor_pos['Observaciones']
                         })
                         
-                        def resaltar_filas(row):
-                            if row['Resultado'] == 'FALTANTE':
-                                return ['background-color: #ffebee; color: #b71c1c'] * len(row)
-                            elif row['Resultado'] == 'SOBRANTE':
-                                return ['background-color: #fff8e1; color: #f57f17'] * len(row)
-                            else:
-                                return ['background-color: #e8f5e9; color: #1b5e20'] * len(row)
-
-                        st.markdown("### Reporte de la Auditoría")
-                        st.dataframe(df_rep_pos.style.apply(resaltar_filas, axis=1), use_container_width=True, hide_index=True)
-                        
-                        csv_pos = df_rep_pos.to_csv(index=False, sep=';', decimal=',')
-                        fecha_hoy = datetime.datetime.now().strftime("%d-%m")
-                        st.download_button(
-                            label="Descargar Reporte de Posición (.csv)",
-                            data=csv_pos,
-                            file_name=f"REG-AUD-POS-{pos_actual.replace(' / ', '-').replace('/', '-')}-{fecha_hoy}.csv",
-                            mime="text/csv"
-                        )
+                        confirmar_e_impactar_consolidado(df_rep_pos)
                 else:
                     st.info("No se registran productos en el inventario teórico para esta posición. Puedes auditarla visualmente o seleccionar otra ubicación.")
 
