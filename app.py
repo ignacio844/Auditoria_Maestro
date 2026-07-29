@@ -6,6 +6,7 @@ import glob
 import os
 import plotly.express as px
 import plotly.graph_objects as go
+from streamlit_gsheets import GSheetsConnection
 
 # Configuración básica de la página
 st.set_page_config(page_title="Sistema de Auditoría de Inventario", layout="wide")
@@ -203,12 +204,17 @@ def obtener_ruta_base_consolidada():
                 return os.path.join(root, file)
     return "Base_de_Datos_Consolidada_Auditorías_de_Productos_V4.csv"
 
-@st.cache_data
+# Carga de la base consolidada (DIRECTO DESDE GOOGLE SHEETS)
+@st.cache_data(ttl=10) # Refresca cada 10 segundos para ver los cambios rápido
 def cargar_base_consolidada():
-    ruta = obtener_ruta_base_consolidada()
-    if os.path.exists(ruta):
-        return pd.read_csv(ruta)
-    return None
+    try:
+        conn = st.connection("gsheets", type=GSheetsConnection)
+        # REEMPLAZA ESTA URL POR EL LINK DE TU GOOGLE SHEET
+        url_sheet = "https://docs.google.com/spreadsheets/d/1cxjiOrp-3ze99r-bPTU1OVEGGOMkRABwWzgkIHpC1Nw/edit"
+        df = conn.read(spreadsheet=url_sheet)
+        return df
+    except Exception as e:
+        return None
 
 # ---------------------------------------------------------
 # FUNCIÓN EMERGENTE 1: RUTA DE AUDITORÍA
@@ -296,13 +302,26 @@ def confirmar_e_impactar_consolidado(df_preparado):
             cols_base = ['Nombre del Archivo Origen', 'Categoría', 'Código', 'Stock Octosis', 'Stock auditado', 'Diferencia', 'Resultado', 'Observaciones']
             df_para_anexar = df_confirmado[[c for c in cols_base if c in df_confirmado.columns]]
             
-            ruta_csv = obtener_ruta_base_consolidada()
-            
-            if os.path.exists(ruta_csv):
-                df_existente = pd.read_csv(ruta_csv)
+            try:
+                conn = st.connection("gsheets", type=GSheetsConnection)
+                # REEMPLAZA ESTA URL POR EL LINK DE TU GOOGLE SHEET
+                url_sheet = "https://docs.google.com/spreadsheets/d/1cxjiOrp-3ze99r-bPTU1OVEGGOMkRABwWzgkIHpC1Nw/edit"
+                
+                # Leemos la base actual de Sheets
+                df_existente = conn.read(spreadsheet=url_sheet)
+                
+                # Unimos lo viejo con las nuevas filas de la auditoría
                 df_final_actualizado = pd.concat([df_existente, df_para_anexar], ignore_index=True)
-            else:
-                df_final_actualizado = df_para_anexar
+                
+                # Escribimos todo de vuelta a Google Sheets
+                conn.update(spreadsheet=url_sheet, data=df_final_actualizado)
+                
+                st.cache_data.clear() # Limpiar caché para refrescar el dashboard al instante
+                st.session_state['muestra_actual'] = pd.DataFrame()
+                st.success("¡Datos guardados e impactados con éxito en Google Sheets!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error de conexión con Google Sheets: Revisa los permisos y los Secrets.")
                 
             # Guardado en disco
             df_final_actualizado.to_csv(ruta_csv, index=False)
