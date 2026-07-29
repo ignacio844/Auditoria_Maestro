@@ -160,17 +160,23 @@ def parse_posicion_completa(p):
         return nivel, seccion, modulo, pos_base, p_clean
     return "Otros", "Otros", "Otros", p_clean, p_clean
 
-# Carga de la base consolidada
+# Carga de la base consolidada (Búsqueda resistente a tildes y mayúsculas en Linux)
 @st.cache_data
 def cargar_base_consolidada():
-    archivos = glob.glob("*Base_de_Datos_Consolidada*.csv")
-    if archivos:
-        return pd.read_csv(archivos[0])
+    import os
+    # Obtenemos todos los archivos CSV de la carpeta
+    archivos_csv = glob.glob("*.csv")
+    
+    # Buscamos alguno que tenga "consolidada" en el nombre (ignorando mayúsculas y tildes)
+    for archivo in archivos_csv:
+        if "consolidada" in archivo.lower():
+            return pd.read_csv(archivo)
+            
+    # Fallback de seguridad
     try:
         return pd.read_csv("Base_de_Datos_Consolidada_Auditorías_de_Productos_V4.csv")
     except FileNotFoundError:
         return None
-
 # ---------------------------------------------------------
 # FUNCIÓN EMERGENTE: RUTA DE AUDITORÍA (SNAKE PATH)
 # ---------------------------------------------------------
