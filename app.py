@@ -10,46 +10,9 @@ import plotly.graph_objects as go
 # Configuración básica de la página
 st.set_page_config(page_title="Sistema de Auditoría de Inventario", layout="wide")
 
-# --- ESTILOS VISUALES CORPORATIVOS (AZUL & TARJETAS REDONDEADAS) ---
+# --- ESTILOS VISUALES CORPORATIVOS ---
 st.markdown("""
     <style>
-    /* Botones primarios (Más altos, grandes y profesionales) */
-    button[kind="primary"], button[kind="primaryFormSubmit"] {
-        background-color: #0D6EFD !important;
-        border-color: #0D6EFD !important;
-        color: white !important;
-        padding: 0.8rem 1rem !important; 
-        font-weight: 700 !important;
-        font-size: 1.1rem !important;
-    }
-    
-    /* Tarjetas de Métricas de Recuento (Azul Oscuro para Modo Claro) */
-    .metric-card-dark {
-        background-color: #0f172a;
-        border: 1px solid #1e293b;
-        border-radius: 10px;
-        padding: 1.2rem 1rem;
-        text-align: center;
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-    }
-    .metric-card-dark-label {
-        font-size: 0.85rem;
-        color: #94a3b8;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        margin-bottom: 0.3rem;
-    }
-    .metric-card-dark-val {
-        font-size: 2.2rem;
-        color: #f8fafc;
-        font-weight: 800;
-        line-height: 1.1;
-    }
     /* Estilizado del Sidebar */
     [data-testid="stSidebar"] {
         background-color: #0f172a !important;
@@ -74,14 +37,14 @@ st.markdown("""
         border-radius: 6px !important;
     }
     
-    /* Botones primarios (Más altos y profesionales) */
+    /* Botones primarios (Más altos, grandes y profesionales) */
     button[kind="primary"], button[kind="primaryFormSubmit"] {
         background-color: #0D6EFD !important;
         border-color: #0D6EFD !important;
         color: white !important;
-        padding: 0.6rem 1rem !important; 
-        font-weight: 600 !important;
-        font-size: 1.05rem !important;
+        padding: 0.8rem 1rem !important; 
+        font-weight: 700 !important;
+        font-size: 1.1rem !important;
     }
     button[kind="primary"]:hover, button[kind="primaryFormSubmit"]:hover {
         background-color: #0b5ed7 !important;
@@ -100,7 +63,7 @@ st.markdown("""
         background-color: rgba(13, 110, 253, 0.02);
     }
 
-    /* Tarjetas Contenedoras de Gráficos */
+    /* Tarjetas Contenedoras de Gráficos (Redondeadas & Translúcidas) */
     div[data-testid="stPlotlyChart"] {
         background-color: rgba(30, 41, 59, 0.4) !important;
         border: 1px solid rgba(13, 110, 253, 0.2) !important;
@@ -174,6 +137,7 @@ st.markdown("""
         text-align: center;
         color: #e2e8f0;
     }
+    
     .kpi-eri-green {
         background-color: rgba(16, 185, 129, 0.12) !important;
         border: 2px solid #10b981 !important;
@@ -198,6 +162,7 @@ st.markdown("""
         padding: 0.8rem;
         text-align: center;
     }
+
     .dash-kpi-label {
         font-size: 0.8rem;
         font-weight: 700;
@@ -228,9 +193,10 @@ def parse_posicion_completa(p):
 # Carga de la base consolidada
 @st.cache_data
 def cargar_base_consolidada():
-    archivos = glob.glob("*Base_de_Datos_Consolidada*.csv")
-    if archivos:
-        return pd.read_csv(archivos[0])
+    archivos_csv = glob.glob("*.csv")
+    for archivo in archivos_csv:
+        if "consolidada" in archivo.lower():
+            return pd.read_csv(archivo)
     try:
         return pd.read_csv("Base_de_Datos_Consolidada_Auditorías_de_Productos_V4.csv")
     except FileNotFoundError:
@@ -485,6 +451,7 @@ if seccion_activa == "Resumen Consolidado":
             
             c_graf1, c_graf2 = st.columns(2)
             
+            # --- GRÁFICO 1: EVOLUCIÓN ERI ---
             with c_graf1:
                 df_dash['Semana_Num'] = df_dash['Nombre del Archivo Origen'].str.extract(r'(\d+)').astype(float)
                 df_sem = df_dash.groupby(['Nombre del Archivo Origen', 'Semana_Num']).apply(
@@ -536,6 +503,7 @@ if seccion_activa == "Resumen Consolidado":
                     key="chart_linea_interactivo"
                 )
                 
+            # --- GRÁFICO 2: RESULTADO AUDITORÍAS ---
             with c_graf2:
                 df_obs = df_dash[df_dash['Observaciones'] != 'Sin observaciones']['Observaciones'].value_counts().reset_index()
                 df_obs.columns = ['Observacion', 'Cantidad']
@@ -660,6 +628,33 @@ elif seccion_activa == "Auditoría Live":
                         df_filtrado = df_filtrado[df_filtrado["Clasificación Valor"] == valor_sel]
                         
                     if not st.session_state['muestra_actual'].empty:
+                        skus_ya_seleccionados = st.session_state['muestra_actual']['Cod Sku'].unique().tolist()
+                        df_filtrado = df_filtrado[~df_filtrado['Cod Sku'].isin(skus_ya_seleccionados)]
+                    
+                    df_filtrado = df_filtrado[df_filtrado['Cod Sku'].isin(df_inv[col_codigo_inv])]
+                        
+                    if not df_filtrado.empty:
+                        nueva_muestra_base = df_filtrado.sample(min(tamano_muestra, len(df_filtrado)))
+                        
+                        cruce_inmediato = pd.merge(
+                            nueva_muestra_base, df_inv, how='left', left_on='Cod Sku', right_on=col_codigo_inv
+                        )
+                        
+                        if st.session_state['muestra_actual'].empty:
+                            st.session_state['muestra_actual'] = cruce_inmediato
+                        else:
+                            st.session_state['muestra_actual'] = pd.concat(
+                                [st.session_state['muestra_actual'], cruce_inmediato], ignore_index=True
+                            )
+                    else:
+                        st.info("No hay más productos que coincidan con los filtros seleccionados.")
+            
+            if not st.session_state['muestra_actual'].empty:
+                if st.button("Limpiar Muestra", use_container_width=True):
+                    st.session_state['muestra_actual'] = pd.DataFrame()
+                    st.rerun()
+
+        if not st.session_state['muestra_actual'].empty:
             st.markdown("---")
             st.markdown("### Carga de Recuento Físico")
             
@@ -685,98 +680,11 @@ elif seccion_activa == "Auditoría Live":
                     </div>
                 """, unsafe_allow_html=True)
                 
-            # Dejamos estos contenedores vacíos para actualizarlos después del recuento
             placeholder_pendientes = c_m2.empty()
             placeholder_diferencias = c_m3.empty()
             
             with c_btn:
-                st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True) # Espaciador para centrar
-                if st.button("🗺️ Calcular Ruta Óptima", type="primary", use_container_width=True):
-                    mostrar_ruta_auditoria(st.session_state['muestra_actual'], col_posicion_inv, col_deposito_inv)
-            
-            st.markdown("<br>", unsafe_allow_html=True)
-            
-            # --- TABLA DE EDICIÓN ---
-            df_editado = st.data_editor(
-                df_recuento,
-                column_config={
-                    "Cod Sku": st.column_config.TextColumn("Código", disabled=True),
-                    "Descripcion": st.column_config.TextColumn("Descripción", disabled=True),
-                    col_posicion_inv: st.column_config.TextColumn("Posición", disabled=True),
-                    col_deposito_inv: st.column_config.TextColumn("Depósito", disabled=True),
-                    col_stock_inv: st.column_config.NumberColumn("Stock Teórico", disabled=True),
-                    "Stock auditado": st.column_config.NumberColumn("Stock Físico", required=True),
-                    "Observaciones": st.column_config.TextColumn("Observaciones")
-                },
-                use_container_width=True,
-                hide_index=True,
-                num_rows="dynamic",
-                key="editor_auditoria_prod"
-            )
-
-            # --- CÁLCULOS DINÁMICOS PARA LAS TARJETAS ---
-            faltan_cargar = df_editado['Stock auditado'].isna().sum()
-            
-            placeholder_pendientes.markdown(f"""
-                <div class="metric-card-dark">
-                    <div class="metric-card-dark-label">Pendientes</div>
-                    <div class="metric-card-dark-val" style="color: {'#38bdf8' if faltan_cargar == 0 else '#facc15'};">{faltan_cargar}</div>
-                </div>
-            """, unsafe_allow_html=True)
-            
-            st_teorico_temp = pd.to_numeric(df_editado[col_stock_inv], errors='coerce').fillna(0)
-            st_fisico_temp = pd.to_numeric(df_editado['Stock auditado'], errors='coerce')
-            dif_reales = ((st_fisico_temp.notna()) & (st_fisico_temp != st_teorico_temp)).sum()
-            
-            placeholder_diferencias.markdown(f"""
-                <div class="metric-card-dark">
-                    <div class="metric-card-dark-label">Diferencias</div>
-                    <div class="metric-card-dark-val" style="color: {'#10b981' if dif_reales == 0 else '#f87171'};">{dif_reales}</div>
-                </div>
-            """, unsafe_allow_html=True)
-            
-            if faltan_cargar > 0:
-                st.info(f"Falta ingresar el recuento físico de {faltan_cargar} posiciones para habilitar el reporte.")
-            
-            # (AQUÍ SIGUE EL BOTÓN DE GENERAR REPORTE QUE YA TENÍAS)
-            if st.button("Generar Reporte Final", type="primary", disabled=(faltan_cargar > 0)):
-            
-            if not st.session_state['muestra_actual'].empty:
-                if st.button("Limpiar Muestra", use_container_width=True):
-                    st.session_state['muestra_actual'] = pd.DataFrame()
-                    st.rerun()
-
-        if not st.session_state['muestra_actual'].empty:
-            st.markdown("---")
-            st.markdown("### Carga de Recuento Físico")
-            
-            df_recuento = st.session_state['muestra_actual'].copy()
-            
-            if 'Stock auditado' not in df_recuento.columns:
-                df_recuento['Stock auditado'] = None
-            if 'Observaciones' not in df_recuento.columns:
-                df_recuento['Observaciones'] = ""
-                
-            columnas_edicion = ['Cod Sku', 'Descripcion', col_posicion_inv, col_deposito_inv, col_stock_inv, 'Stock auditado', 'Observaciones']
-            columnas_existentes = [col for col in columnas_edicion if col in df_recuento.columns]
-            df_recuento = df_recuento[columnas_existentes]
-            
-            # --- NUEVA GRILLA DE MÉTRICAS Y BOTÓN RUTA ---
-            c_m1, c_m2, c_m3, c_btn = st.columns([1, 1, 1, 1.2])
-            
-            with c_m1:
-                st.markdown(f"""
-                    <div class="metric-card-dark">
-                        <div class="metric-card-dark-label">Posiciones</div>
-                        <div class="metric-card-dark-val">{len(df_recuento)}</div>
-                    </div>
-                """, unsafe_allow_html=True)
-                
-            placeholder_pendientes = c_m2.empty()
-            placeholder_diferencias = c_m3.empty()
-            
-            with c_btn:
-                st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+                st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
                 if st.button("🗺️ Calcular Ruta Óptima", type="primary", use_container_width=True):
                     mostrar_ruta_auditoria(st.session_state['muestra_actual'], col_posicion_inv, col_deposito_inv)
             
