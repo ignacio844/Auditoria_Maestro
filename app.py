@@ -295,11 +295,21 @@ def confirmar_e_impactar_consolidado(df_preparado):
         if st.button("✅ Confirmar y Guardar en Base", type="primary", use_container_width=True):
             df_confirmado["Nombre del Archivo Origen"] = semana_ingresada
             cols_base = ['Nombre del Archivo Origen', 'Categoría', 'Código', 'Stock Octosis', 'Stock auditado', 'Diferencia', 'Resultado', 'Observaciones']
-            df_para_anexar = df_confirmado[[c for c in cols_base if c in df_confirmado.columns]]
+            df_para_anexar = df_confirmado[[c for c in cols_base if c in df_confirmado.columns]].copy()
             
             try:
                 conn = st.connection("gsheets", type=GSheetsConnection)
                 df_existente = conn.read(spreadsheet=URL_GOOGLE_SHEETS)
+                
+                # --- MEJORA ESTRUCTURAL: Agregar Fecha y Tipo automáticamente ---
+                if len(df_existente.columns) > 0:
+                    col_fecha = df_existente.columns[0] # Toma la primera columna (Fecha)
+                    df_para_anexar[col_fecha] = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                
+                if "Tipo de Auditoría" in df_existente.columns:
+                    df_para_anexar["Tipo de Auditoría"] = tipo_auditoria.upper()
+                # ---------------------------------------------------------------
+                
                 df_final_actualizado = pd.concat([df_existente, df_para_anexar], ignore_index=True)
                 
                 conn.update(spreadsheet=URL_GOOGLE_SHEETS, data=df_final_actualizado)
