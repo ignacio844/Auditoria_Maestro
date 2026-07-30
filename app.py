@@ -643,13 +643,23 @@ if seccion_activa == "Resumen Consolidado":
         
         st.markdown("### Detalle de Auditorías de Productos")
         
-        semanas_list = ["Todas"] + sorted(df_dash['Nombre del Archivo Origen'].astype(str).unique().tolist())
-        
+        # Extracción segura de valores únicos para los filtros
+        if 'Nombre del Archivo Origen' in df_dash.columns:
+            semanas_unicas = df_dash['Nombre del Archivo Origen'].dropna().unique()
+            semanas_list = ["Todas"] + sorted([str(x) for x in semanas_unicas])
+        else:
+            semanas_list = ["Todas"]
+            
         col_f1, col_f2, col_f3 = st.columns([1, 1, 2])
         with col_f1:
             st.selectbox("Filtrar por Semana:", semanas_list, key="combo_semana_dash")
+            
         with col_f2:
-            obs_list = ["Todas"] + sorted(df_dash['Observaciones'].astype(str).unique().tolist())
+            if 'Observaciones' in df_dash.columns:
+                obs_unicas = df_dash['Observaciones'].dropna().unique()
+                obs_list = ["Todas"] + sorted([str(x) for x in obs_unicas])
+            else:
+                obs_list = ["Todas"]
             st.selectbox("Filtrar por Observación:", obs_list, key="combo_obs_dash")
 
         if filtro_aplicado_txt:
