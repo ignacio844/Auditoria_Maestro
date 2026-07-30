@@ -11,6 +11,12 @@ from streamlit_gsheets import GSheetsConnection
 # Configuración básica de la página
 st.set_page_config(page_title="Sistema de Auditoría de Inventario", layout="wide")
 
+# =========================================================
+# CONFIGURACIÓN DE GOOGLE SHEETS
+# =========================================================
+# ⚠️ REEMPLAZA ESTA URL POR LA DE TU GOOGLE SHEET REAL
+URL_GOOGLE_SHEETS = "https://docs.google.com/spreadsheets/d/1cxjiOrp-3ze99r-bPTU1OVEGGOMkRABwWzgkIHpC1Nw/edit?gid=66321362#gid=66321362"
+
 # --- ESTILOS VISUALES CORPORATIVOS ---
 st.markdown("""
     <style>
@@ -196,24 +202,17 @@ def parse_posicion_completa(p):
         return nivel, seccion, modulo, pos_base, p_clean
     return "Otros", "Otros", "Otros", p_clean, p_clean
 
-# Carga de la base consolidada
-def obtener_ruta_base_consolidada():
-    for root, dirs, files in os.walk("."):
-        for file in files:
-            if "consolidada" in file.lower() and file.lower().endswith(".csv"):
-                return os.path.join(root, file)
-    return "Base_de_Datos_Consolidada_Auditorías_de_Productos_V4.csv"
-
 # Carga de la base consolidada (DIRECTO DESDE GOOGLE SHEETS)
-@st.cache_data(ttl=10) # Refresca cada 10 segundos para ver los cambios rápido
+@st.cache_data(ttl=10)
 def cargar_base_consolidada():
+    if "TU_ID_AQUI" in URL_GOOGLE_SHEETS:
+        return None
     try:
         conn = st.connection("gsheets", type=GSheetsConnection)
-        # REEMPLAZA ESTA URL POR EL LINK DE TU GOOGLE SHEET
-        url_sheet = "https://docs.google.com/spreadsheets/d/1cxjiOrp-3ze99r-bPTU1OVEGGOMkRABwWzgkIHpC1Nw/edit"
-        df = conn.read(spreadsheet=url_sheet)
+        df = conn.read(spreadsheet=URL_GOOGLE_SHEETS)
         return df
     except Exception as e:
+        st.error(f"Error de lectura en Google Sheets: {e}")
         return None
 
 # ---------------------------------------------------------
@@ -261,19 +260,17 @@ def mostrar_ruta_auditoria(df, col_pos, col_dep):
 # ---------------------------------------------------------
 @st.dialog("Confirmación e Impacto en Base Consolidada", width="large")
 def confirmar_e_impactar_consolidado(df_preparado):
-    st.write("Revisa los resultados obtenidos. Puedes corregir manualmente el **Resultado** (ej: marcar OK si la diferencia es tolerable) o las **Observaciones** antes de guardar.")
+    st.write("Revisa los resultados obtenidos. Puedes corregir manualmente el **Resultado** o las **Observaciones** antes de guardar.")
     
-    # Identificar última semana registrada para sugerir la siguiente
     semana_sugerida = "SEMANA 31"
     df_actual_cons = cargar_base_consolidada()
     if df_actual_cons is not None and 'Nombre del Archivo Origen' in df_actual_cons.columns:
-        semanas_existentes = df_actual_cons['Nombre del Archivo Origen'].unique().tolist()
+        semanas_existentes = df_actual_cons['Nombre del Archivo Origen'].dropna().unique().tolist()
         if semanas_existentes:
-            semana_sugerida = semanas_existentes[-1]
+            semana_sugerida = str(semanas_existentes[-1])
 
     semana_ingresada = st.text_input("Etiqueta de Semana / Identificador:", value=semana_sugerida)
     
-    # Permitir edición previa a la inserción
     df_validar = df_preparado.copy()
     
     df_confirmado = st.data_editor(
@@ -297,40 +294,22 @@ def confirmar_e_impactar_consolidado(df_preparado):
     with c_modal1:
         if st.button("✅ Confirmar y Guardar en Base", type="primary", use_container_width=True):
             df_confirmado["Nombre del Archivo Origen"] = semana_ingresada
-            
-            # Formatear columnas estándar de la base consolidada
             cols_base = ['Nombre del Archivo Origen', 'Categoría', 'Código', 'Stock Octosis', 'Stock auditado', 'Diferencia', 'Resultado', 'Observaciones']
             df_para_anexar = df_confirmado[[c for c in cols_base if c in df_confirmado.columns]]
             
             try:
                 conn = st.connection("gsheets", type=GSheetsConnection)
-                # REEMPLAZA ESTA URL POR EL LINK DE TU GOOGLE SHEET
-                url_sheet = "https://docs.google.com/spreadsheets/d/1cxjiOrp-3ze99r-bPTU1OVEGGOMkRABwWzgkIHpC1Nw/edit"
-                
-                # Leemos la base actual de Sheets
-                df_existente = conn.read(spreadsheet=url_sheet)
-                
-                # Unimos lo viejo con las nuevas filas de la auditoría
+                df_existente = conn.read(spreadsheet=URL_GOOGLE_SHEETS)
                 df_final_actualizado = pd.concat([df_existente, df_para_anexar], ignore_index=True)
                 
-                # Escribimos todo de vuelta a Google Sheets
-                conn.update(spreadsheet=url_sheet, data=df_final_actualizado)
+                conn.update(spreadsheet=URL_GOOGLE_SHEETS, data=df_final_actualizado)
                 
-                st.cache_data.clear() # Limpiar caché para refrescar el dashboard al instante
+                st.cache_data.clear()
                 st.session_state['muestra_actual'] = pd.DataFrame()
                 st.success("¡Datos guardados e impactados con éxito en Google Sheets!")
                 st.rerun()
             except Exception as e:
-                st.error(f"Error de conexión con Google Sheets: Revisa los permisos y los Secrets.")
-                
-            # Guardado en disco
-            df_final_actualizado.to_csv(ruta_csv, index=False)
-            st.cache_data.clear() # Limpiar caché para refrescar el dashboard al instante
-            
-            # Resetear la muestra live
-            st.session_state['muestra_actual'] = pd.DataFrame()
-            st.success("¡Datos guardados e impactados con éxito en la Base Consolidada!")
-            st.rerun()
+                st.error(f"Error al escribir en Google Sheets: {e}")
             
     with c_modal2:
         if st.button("Cancelar", use_container_width=True):
@@ -463,8 +442,8 @@ if seccion_activa == "Resumen Consolidado":
     
     df_dash = cargar_base_consolidada()
     
-    if df_dash is None:
-        st.error("No se encontró la base consolidada en el repositorio. Asegúrate de haber subido el .csv")
+    if df_dash is None or df_dash.empty:
+        st.warning("No se pudo cargar la base consolidada desde Google Sheets. Revisa la URL y las credenciales.")
     else:
         df_dash['Stock auditado'] = pd.to_numeric(df_dash['Stock auditado'], errors='coerce').fillna(0)
         df_dash['Stock Octosis'] = pd.to_numeric(df_dash['Stock Octosis'], errors='coerce').fillna(0)
@@ -550,7 +529,7 @@ if seccion_activa == "Resumen Consolidado":
             c_graf1, c_graf2 = st.columns(2)
             
             with c_graf1:
-                df_dash['Semana_Num'] = df_dash['Nombre del Archivo Origen'].str.extract(r'(\d+)').astype(float)
+                df_dash['Semana_Num'] = df_dash['Nombre del Archivo Origen'].astype(str).str.extract(r'(\d+)').astype(float)
                 df_sem = df_dash.groupby(['Nombre del Archivo Origen', 'Semana_Num']).apply(
                     lambda g: pd.Series({
                         'Total': len(g),
@@ -605,15 +584,16 @@ if seccion_activa == "Resumen Consolidado":
                 df_obs.columns = ['Observacion', 'Cantidad']
                 
                 def formatear_etiqueta(texto):
-                    if "Diferencias en posiciones" in texto:
+                    texto_str = str(texto)
+                    if "Diferencias en posiciones" in texto_str:
                         return "Diferencias<br>cruzadas"
-                    elif "posición errónea" in texto:
+                    elif "posición errónea" in texto_str:
                         return "Posición<br>errónea"
-                    words = texto.split()
-                    if len(texto) > 14 and len(words) > 1:
+                    words = texto_str.split()
+                    if len(texto_str) > 14 and len(words) > 1:
                         mid = len(words) // 2
                         return "<br>".join([" ".join(words[:mid]), " ".join(words[mid:])])
-                    return texto
+                    return texto_str
 
                 df_obs['Observacion_Formateada'] = df_obs['Observacion'].apply(formatear_etiqueta)
                 max_cant = df_obs['Cantidad'].max() if not df_obs.empty else 10
@@ -663,13 +643,13 @@ if seccion_activa == "Resumen Consolidado":
         
         st.markdown("### Detalle de Auditorías de Productos")
         
-        semanas_list = ["Todas"] + sorted(df_dash['Nombre del Archivo Origen'].unique().tolist())
+        semanas_list = ["Todas"] + sorted(df_dash['Nombre del Archivo Origen'].astype(str).unique().tolist())
         
         col_f1, col_f2, col_f3 = st.columns([1, 1, 2])
         with col_f1:
             st.selectbox("Filtrar por Semana:", semanas_list, key="combo_semana_dash")
         with col_f2:
-            obs_list = ["Todas"] + sorted(df_dash['Observaciones'].unique().tolist())
+            obs_list = ["Todas"] + sorted(df_dash['Observaciones'].astype(str).unique().tolist())
             st.selectbox("Filtrar por Observación:", obs_list, key="combo_obs_dash")
 
         if filtro_aplicado_txt:
@@ -854,7 +834,6 @@ elif seccion_activa == "Auditoría Live":
                     'Observaciones': df_editado['Observaciones']
                 })
                 
-                # Desplegar la ventana modal emergente de confirmación
                 confirmar_e_impactar_consolidado(df_preparado)
 
     elif tipo_auditoria == "Posiciones":
