@@ -539,6 +539,13 @@ if seccion_activa == "Resumen Consolidado":
             c_graf1, c_graf2 = st.columns(2)
             
             with c_graf1:
+                # --- TÍTULO TARJETA: GRÁFICO IZQUIERDA ---
+                st.markdown("""
+                    <div style="background-color: #0f172a; padding: 12px; border-radius: 8px; border: 1px solid #1e293b; text-align: center; margin-bottom: 10px;">
+                        <span style="color: #f8fafc; font-size: 14px; font-weight: bold; letter-spacing: 1px;">EVOLUCIÓN SEMANAL DE AUDITORÍA</span>
+                    </div>
+                """, unsafe_allow_html=True)
+                
                 df_dash['Semana_Num'] = df_dash['Nombre del Archivo Origen'].astype(str).str.extract(r'(\d+)').astype(float)
                 df_sem = df_dash.groupby(['Nombre del Archivo Origen', 'Semana_Num']).apply(
                     lambda g: pd.Series({
@@ -577,7 +584,7 @@ if seccion_activa == "Resumen Consolidado":
                     height=340, 
                     yaxis=dict(title="", range=[0, 105], ticksuffix="%", gridcolor='rgba(255,255,255,0.06)'),
                     xaxis=dict(gridcolor='rgba(255,255,255,0.06)', tickfont=dict(size=10, color='#cbd5e1')),
-                    margin=dict(l=20, r=20, t=30, b=45), 
+                    margin=dict(l=20, r=20, t=10, b=45), # Margen superior (t) reducido a 10
                     legend=dict(orientation="h", yanchor="bottom", y=1.0, xanchor="center", x=0.5, font=dict(size=10, color='#94a3b8')) 
                 )
                 
@@ -590,6 +597,13 @@ if seccion_activa == "Resumen Consolidado":
                 )
                 
             with c_graf2:
+                # --- TÍTULO TARJETA: GRÁFICO DERECHA ---
+                st.markdown("""
+                    <div style="background-color: #0f172a; padding: 12px; border-radius: 8px; border: 1px solid #1e293b; text-align: center; margin-bottom: 10px;">
+                        <span style="color: #f8fafc; font-size: 14px; font-weight: bold; letter-spacing: 1px;">TOP OBSERVACIONES</span>
+                    </div>
+                """, unsafe_allow_html=True)
+                
                 df_obs = df_dash[df_dash['Observaciones'] != 'Sin observaciones']['Observaciones'].value_counts().reset_index()
                 df_obs.columns = ['Observacion', 'Cantidad']
                 
@@ -638,7 +652,7 @@ if seccion_activa == "Resumen Consolidado":
                         range=[0, max_cant * 1.25], 
                         gridcolor='rgba(255,255,255,0.06)'
                     ),
-                    margin=dict(l=20, r=20, t=30, b=55) 
+                    margin=dict(l=20, r=20, t=10, b=55) # Margen superior (t) reducido a 10
                 )
                 
                 st.plotly_chart(
