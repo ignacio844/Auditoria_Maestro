@@ -534,7 +534,22 @@ elif seccion_activa == "Auditoría Live":
             if os.path.exists("backup_auditoria_prod.csv") and st.session_state['muestra_actual'].empty:
                 st.info("⚠️ El sistema detectó que tienes una auditoría en pausa de una sesión anterior.")
                 if st.button("Recuperar Auditoría Pendiente", icon=":material/restore:", type="primary"):
-                    st.session_state['muestra_actual'] = pd.read_csv("backup_auditoria_prod.csv")
+                    df_recuperado = pd.read_csv("backup_auditoria_prod.csv")
+                    
+                    # --- BLINDAJE DE TIPOS DE DATOS ---
+                    cols_texto = ['Cod Sku', 'Descripcion', col_posicion_inv, col_deposito_inv, 'Observaciones']
+                    for c in cols_texto:
+                        if c in df_recuperado.columns:
+                            # Forzamos a texto y limpiamos los falsos 'nan'
+                            df_recuperado[c] = df_recuperado[c].astype(str).replace('nan', '')
+                            
+                    if 'Stock auditado' in df_recuperado.columns:
+                        df_recuperado['Stock auditado'] = pd.to_numeric(df_recuperado['Stock auditado'], errors='coerce')
+                    if col_stock_inv in df_recuperado.columns:
+                        df_recuperado[col_stock_inv] = pd.to_numeric(df_recuperado[col_stock_inv], errors='coerce')
+                    # ----------------------------------
+                        
+                    st.session_state['muestra_actual'] = df_recuperado
                     st.rerun()
 
             st.write("Filtros Aleatorios")
