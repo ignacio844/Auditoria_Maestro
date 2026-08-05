@@ -14,13 +14,11 @@ st.set_page_config(page_title="Sistema de Auditoría de Inventario", layout="wid
 # =========================================================
 # CONFIGURACIÓN DE GOOGLE SHEETS
 # =========================================================
-# ⚠️ REEMPLAZA ESTA URL POR LA DE TU GOOGLE SHEET REAL
-URL_GOOGLE_SHEETS = "https://docs.google.com/spreadsheets/d/1cxjiOrp-3ze99r-bPTU1OVEGGOMkRABwWzgkIHpC1Nw/edit?gid=66321362#gid=66321362"
+URL_GOOGLE_SHEETS = "https://docs.google.com/spreadsheets/d/1cxjiOrp-3ze99r-bPTU1OVEGGOMkRABwWzgKIHpC1Nw/edit"
 
 # --- ESTILOS VISUALES CORPORATIVOS ---
 st.markdown("""
     <style>
-    /* Estilizado del Sidebar */
     [data-testid="stSidebar"] {
         background-color: #0f172a !important;
         border-right: 1px solid rgba(13, 110, 253, 0.2) !important;
@@ -29,22 +27,17 @@ st.markdown("""
         color: #f1f5f9 !important;
         font-size: 1.1rem !important;
         font-weight: 700 !important;
-        letter-spacing: 0.5px !important;
     }
     [data-testid="stSidebar"] label {
         color: #94a3b8 !important;
         font-size: 0.9rem !important;
     }
-    
-    /* Selectbox del Sidebar */
     [data-testid="stSidebar"] div[data-baseweb="select"] > div {
         background-color: #1e293b !important;
         border: 1px solid rgba(13, 110, 253, 0.3) !important;
         color: #f8fafc !important;
         border-radius: 6px !important;
     }
-    
-    /* Botones primarios */
     button[kind="primary"], button[kind="primaryFormSubmit"] {
         background-color: #0D6EFD !important;
         border-color: #0D6EFD !important;
@@ -57,35 +50,23 @@ st.markdown("""
         background-color: #0b5ed7 !important;
         border-color: #0a58ca !important;
     }
-
-    /* BOTÓN ESPECÍFICO DE RUTA */
     button[title="Calcula la ruta óptima para el recorrido"] {
         height: 98px !important;
         border-radius: 8px !important;
         font-size: 1.15rem !important;
     }
-    
     [data-testid="stForm"] {
         background-color: rgba(13, 110, 253, 0.03);
         border: 1px solid rgba(13, 110, 253, 0.2);
         border-radius: 8px;
         padding: 1rem;
     }
-    
-    [data-testid="stFileUploadDropzone"] {
-        border-color: rgba(13, 110, 253, 0.3);
-        background-color: rgba(13, 110, 253, 0.02);
-    }
-
-    /* Tarjetas Contenedoras de Gráficos */
     div[data-testid="stPlotlyChart"] {
         background-color: rgba(30, 41, 59, 0.4) !important;
         border: 1px solid rgba(13, 110, 253, 0.2) !important;
         border-radius: 12px !important;
         padding: 0.8rem !important;
     }
-
-    /* Tarjeta Destacada Posición Semanal */
     .posicion-card {
         background-color: rgba(13, 110, 253, 0.06);
         border: 2px solid #0D6EFD;
@@ -105,8 +86,6 @@ st.markdown("""
         color: #0D6EFD;
         font-weight: 800;
     }
-
-    /* Tarjetas Soft Blue */
     .metric-card-soft {
         background-color: rgba(13, 110, 253, 0.05);
         border: 1px solid rgba(13, 110, 253, 0.25);
@@ -131,16 +110,6 @@ st.markdown("""
         color: #ffffff;
         font-weight: 800;
         line-height: 1.1;
-    }
-
-    /* TARJETAS KPI RESUMEN CONSOLIDADO */
-    .dash-kpi-grey {
-        background-color: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 255, 255, 0.15);
-        border-radius: 8px;
-        padding: 0.8rem;
-        text-align: center;
-        color: #e2e8f0;
     }
     .dash-kpi-blue {
         background-color: rgba(13, 110, 253, 0.05);
@@ -174,7 +143,6 @@ st.markdown("""
         padding: 0.8rem;
         text-align: center;
     }
-
     .dash-kpi-label {
         font-size: 0.8rem;
         font-weight: 700;
@@ -190,7 +158,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Función auxiliar para parsear componentes de la posición
 def parse_posicion_completa(p):
     p_clean = re.sub(r'\s+', ' ', str(p).strip())
     m = re.match(r'^(\d+)([A-Za-z]+)\s*/\s*(\d+)\s*(\d+)?$', p_clean)
@@ -202,11 +169,8 @@ def parse_posicion_completa(p):
         return nivel, seccion, modulo, pos_base, p_clean
     return "Otros", "Otros", "Otros", p_clean, p_clean
 
-# Carga de la base consolidada (DIRECTO DESDE GOOGLE SHEETS)
 @st.cache_data(ttl=10)
 def cargar_base_consolidada():
-    if "TU_ID_AQUI" in URL_GOOGLE_SHEETS:
-        return None
     try:
         conn = st.connection("gsheets", type=GSheetsConnection)
         df = conn.read(spreadsheet=URL_GOOGLE_SHEETS)
@@ -215,28 +179,19 @@ def cargar_base_consolidada():
         st.error(f"Error de lectura en Google Sheets: {e}")
         return None
 
-# ---------------------------------------------------------
-# FUNCIÓN EMERGENTE 1: RUTA DE AUDITORÍA
-# ---------------------------------------------------------
 @st.dialog("Ruta Óptima de Auditoría", width="large")
 def mostrar_ruta_auditoria(df, col_pos, col_dep):
     st.write("Sigue este orden para minimizar tus pasos en el depósito. El sistema alterna el recorrido por cada nivel.")
     df_ruta = df.copy()
-    
     def obtener_nivel_seccion(pos):
         pos_str = str(pos).strip()
         match = re.match(r'^(\d+)([A-Za-z]+)', pos_str)
         if match:
             return int(match.group(1)), match.group(2).upper()
         return 999, 'ZZ' 
-        
-    df_ruta[['Nivel_Temp', 'Seccion_Temp']] = df_ruta[col_pos].apply(
-        lambda x: pd.Series(obtener_nivel_seccion(x))
-    )
-    
+    df_ruta[['Nivel_Temp', 'Seccion_Temp']] = df_ruta[col_pos].apply(lambda x: pd.Series(obtener_nivel_seccion(x)))
     niveles = sorted(df_ruta['Nivel_Temp'].unique())
     df_ordenado = pd.DataFrame()
-    
     for nivel in niveles:
         df_nivel = df_ruta[df_ruta['Nivel_Temp'] == nivel]
         if nivel == 999 or nivel % 2 != 0:
@@ -244,20 +199,14 @@ def mostrar_ruta_auditoria(df, col_pos, col_dep):
         else:
             df_nivel = df_nivel.sort_values(by=['Seccion_Temp'], ascending=False)
         df_ordenado = pd.concat([df_ordenado, df_nivel])
-        
     columnas_mostrar = ['Cod Sku', 'Descripcion', col_pos, col_dep]
     if 'Stock auditado' in df_ordenado.columns:
         columnas_mostrar.append('Stock auditado')
-        
     columnas_finales = [c for c in columnas_mostrar if c in df_ordenado.columns]
-    
     st.dataframe(df_ordenado[columnas_finales], hide_index=True, use_container_width=True)
     if st.button("Cerrar Ruta", use_container_width=True):
         st.rerun()
 
-# ---------------------------------------------------------
-# FUNCIÓN EMERGENTE 2: VALIDACIÓN E IMPACTO A BASE CONSOLIDADA
-# ---------------------------------------------------------
 @st.dialog("Confirmación e Impacto en Base Consolidada", width="large")
 def confirmar_e_impactar_consolidado(df_preparado):
     st.write("Revisa los resultados obtenidos. Puedes corregir manualmente el **Resultado** o las **Observaciones** antes de guardar.")
@@ -301,14 +250,13 @@ def confirmar_e_impactar_consolidado(df_preparado):
                 conn = st.connection("gsheets", type=GSheetsConnection)
                 df_existente = conn.read(spreadsheet=URL_GOOGLE_SHEETS)
                 
-                # --- MEJORA ESTRUCTURAL: Agregar Fecha y Tipo automáticamente ---
+                # --- MEJORA ESTRUCTURAL: Agregar Fecha ---
                 if len(df_existente.columns) > 0:
-                    col_fecha = df_existente.columns[0] # Toma la primera columna (Fecha)
+                    col_fecha = df_existente.columns[0]
                     df_para_anexar[col_fecha] = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
                 
                 if "Tipo de Auditoría" in df_existente.columns:
                     df_para_anexar["Tipo de Auditoría"] = tipo_auditoria.upper()
-                # ---------------------------------------------------------------
                 
                 df_final_actualizado = pd.concat([df_existente, df_para_anexar], ignore_index=True)
                 
@@ -316,6 +264,14 @@ def confirmar_e_impactar_consolidado(df_preparado):
                 
                 st.cache_data.clear()
                 st.session_state['muestra_actual'] = pd.DataFrame()
+                
+                # Limpiamos el Backup local al finalizar con éxito
+                try:
+                    if os.path.exists("backup_auditoria_prod.csv"):
+                        os.remove("backup_auditoria_prod.csv")
+                except:
+                    pass
+                
                 st.success("¡Datos guardados e impactados con éxito en Google Sheets!")
                 st.rerun()
             except Exception as e:
@@ -326,7 +282,7 @@ def confirmar_e_impactar_consolidado(df_preparado):
             st.rerun()
 
 # ---------------------------------------------------------
-# 1. BARRA LATERAL: NAVEGACIÓN Y CARGA DE INVENTARIO
+# 1. BARRA LATERAL
 # ---------------------------------------------------------
 logo_path = "LOGOAFTERMARKETLS_transparente.png"
 if os.path.exists(logo_path):
@@ -337,27 +293,18 @@ else:
         st.sidebar.image(logos[0], use_container_width=True)
 
 st.sidebar.markdown("---")
-
 st.sidebar.header("Menú Principal")
-seccion_activa = st.sidebar.selectbox(
-    "Selecciona una vista:",
-    ["Resumen Consolidado", "Auditoría Live"]
-)
-
+seccion_activa = st.sidebar.selectbox("Selecciona una vista:", ["Resumen Consolidado", "Auditoría Live"])
 st.sidebar.markdown("---")
 
 if seccion_activa == "Auditoría Live":
     st.sidebar.header("Módulo de Auditoría")
-    tipo_auditoria = st.sidebar.selectbox(
-        "Selecciona el tipo de auditoría:",
-        ["Productos", "Posiciones", "Clientes", "Proveedores"]
-    )
+    tipo_auditoria = st.sidebar.selectbox("Selecciona el tipo de auditoría:", ["Productos", "Posiciones", "Clientes", "Proveedores"])
     st.sidebar.markdown("---")
 else:
     tipo_auditoria = "Dashboard"
 
 st.sidebar.header("Inventario Diario")
-
 col_codigo_inv = "Código"
 col_stock_inv = "Saldo" 
 col_posicion_inv = "Estanteria"
@@ -376,11 +323,7 @@ if ID_GOOGLE_DRIVE != "TU_ID_DE_GOOGLE_DRIVE_AQUI":
     except Exception as e:
         st.sidebar.warning("Error al conectar con Drive. Utiliza la carga manual.")
 
-archivo_inventario = st.sidebar.file_uploader(
-    "Sube el archivo de Stock (Excel/CSV):", 
-    type=["xlsx", "xls", "csv"],
-    key="uploader_sidebar_global"
-)
+archivo_inventario = st.sidebar.file_uploader("Sube el archivo de Stock (Excel/CSV):", type=["xlsx", "xls", "csv"], key="uploader_sidebar_global")
 
 if archivo_inventario is not None:
     try:
@@ -388,7 +331,6 @@ if archivo_inventario is not None:
             df_inv_bruto = pd.read_csv(archivo_inventario)
         else:
             df_inv_bruto = pd.read_excel(archivo_inventario)
-        
         df_inv = df_inv_bruto[~df_inv_bruto[col_deposito_inv].astype(str).str.contains('REV|EXT', case=False, na=False)]
         st.session_state['inventario_cargado'] = df_inv
         st.sidebar.success("Inventario cargado correctamente")
@@ -422,19 +364,15 @@ if seccion_activa == "Auditoría Live":
         st.error(f"No se encontró el archivo de base maestra para {tipo_auditoria} en tu repositorio.")
         st.stop()
 
-# ---------------------------------------------------------
-# 2. PANTALLA PRINCIPAL: VISTAS Y MÓDULOS
-# ---------------------------------------------------------
 if 'muestra_actual' not in st.session_state:
     st.session_state['muestra_actual'] = pd.DataFrame()
 if 'posicion_semanal' not in st.session_state:
     st.session_state['posicion_semanal'] = None
 
 # =========================================================
-# VISTA 1: RESUMEN CONSOLIDADO DE AUDITORÍAS
+# VISTA 1: RESUMEN CONSOLIDADO
 # =========================================================
 if seccion_activa == "Resumen Consolidado":
-    
     col_dash_tit, col_dash_btn = st.columns([3, 1])
     with col_dash_tit:
         st.title("Consolidado General de Auditorías")
@@ -449,7 +387,6 @@ if seccion_activa == "Resumen Consolidado":
             st.rerun()
 
     st.markdown("---")
-    
     df_dash = cargar_base_consolidada()
     
     if df_dash is None or df_dash.empty:
@@ -509,165 +446,50 @@ if seccion_activa == "Resumen Consolidado":
         
         with st.container():
             k1, k2, k3 = st.columns(3)
-            
             with k1:
-                st.markdown(f"""
-                    <div class="{eri_class}">
-                        <div class="dash-kpi-label">ERI</div>
-                        <div class="dash-kpi-val">{eri_val:.1f}%</div>
-                    </div>
-                """, unsafe_allow_html=True)
-                
+                st.markdown(f"""<div class="{eri_class}"><div class="dash-kpi-label">ERI</div><div class="dash-kpi-val">{eri_val:.1f}%</div></div>""", unsafe_allow_html=True)
             with k2:
-                st.markdown(f"""
-                    <div class="dash-kpi-blue">
-                        <div class="dash-kpi-label">Desvío Neto</div>
-                        <div class="dash-kpi-val">{int(desvio_neto_val):,}</div>
-                    </div>
-                """, unsafe_allow_html=True)
-                
+                st.markdown(f"""<div class="dash-kpi-blue"><div class="dash-kpi-label">Desvío Neto</div><div class="dash-kpi-val">{int(desvio_neto_val):,}</div></div>""", unsafe_allow_html=True)
             with k3:
-                st.markdown(f"""
-                    <div class="dash-kpi-blue">
-                        <div class="dash-kpi-label">Desvío Absoluto</div>
-                        <div class="dash-kpi-val">{int(desvio_abs_val):,}</div>
-                    </div>
-                """, unsafe_allow_html=True)
+                st.markdown(f"""<div class="dash-kpi-blue"><div class="dash-kpi-label">Desvío Absoluto</div><div class="dash-kpi-val">{int(desvio_abs_val):,}</div></div>""", unsafe_allow_html=True)
                 
             st.markdown("<br>", unsafe_allow_html=True)
-            
             c_graf1, c_graf2 = st.columns(2)
             
             with c_graf1:
-                # --- TÍTULO TARJETA: GRÁFICO IZQUIERDA ---
-                st.markdown("""
-                    <div style="background-color: #0f172a; padding: 12px; border-radius: 8px; border: 1px solid #1e293b; text-align: center; margin-bottom: 10px;">
-                        <span style="color: #f8fafc; font-size: 14px; font-weight: bold; letter-spacing: 1px;">EVOLUCIÓN SEMANAL DE AUDITORÍA</span>
-                    </div>
-                """, unsafe_allow_html=True)
-                
                 df_dash['Semana_Num'] = df_dash['Nombre del Archivo Origen'].astype(str).str.extract(r'(\d+)').astype(float)
                 df_sem = df_dash.groupby(['Nombre del Archivo Origen', 'Semana_Num']).apply(
-                    lambda g: pd.Series({
-                        'Total': len(g),
-                        'OK': (g['Resultado'] == 'OK').sum(),
-                        'ERI': ((g['Resultado'] == 'OK').sum() / len(g)) * 100 if len(g) > 0 else 0
-                    })
+                    lambda g: pd.Series({'Total': len(g), 'OK': (g['Resultado'] == 'OK').sum(), 'ERI': ((g['Resultado'] == 'OK').sum() / len(g)) * 100 if len(g) > 0 else 0})
                 ).reset_index().sort_values('Semana_Num')
-                
                 fig_line = go.Figure()
-                
-                fig_line.add_trace(go.Scatter(
-                    x=df_sem['Nombre del Archivo Origen'],
-                    y=df_sem['ERI'],
-                    mode='lines+markers',
-                    name='Calculo_ERI',
-                    line=dict(color='#0D6EFD', width=3, shape='spline'),
-                    marker=dict(size=8, color='#0D6EFD'),
-                    fill='tozeroy',
-                    fillcolor='rgba(13, 110, 253, 0.12)'
-                ))
-                
-                fig_line.add_trace(go.Scatter(
-                    x=df_sem['Nombre del Archivo Origen'],
-                    y=[95] * len(df_sem),
-                    mode='lines',
-                    name='Objetivo (95%)',
-                    line=dict(color='#dc3545', width=2, dash='dash')
-                ))
-                
-                fig_line.update_layout(
-                    title="",  
-                    paper_bgcolor='rgba(0,0,0,0)',
-                    plot_bgcolor='rgba(0,0,0,0)',
-                    font=dict(color='#e2e8f0', size=11),
-                    height=340, 
-                    yaxis=dict(title="", range=[0, 105], ticksuffix="%", gridcolor='rgba(255,255,255,0.06)'),
-                    xaxis=dict(gridcolor='rgba(255,255,255,0.06)', tickfont=dict(size=10, color='#cbd5e1')),
-                    margin=dict(l=20, r=20, t=10, b=45), # Margen superior (t) reducido a 10
-                    legend=dict(orientation="h", yanchor="bottom", y=1.0, xanchor="center", x=0.5, font=dict(size=10, color='#94a3b8')) 
-                )
-                
-                st.plotly_chart(
-                    fig_line, 
-                    use_container_width=True, 
-                    on_select="rerun", 
-                    selection_mode="points",
-                    key="chart_linea_interactivo"
-                )
+                fig_line.add_trace(go.Scatter(x=df_sem['Nombre del Archivo Origen'], y=df_sem['ERI'], mode='lines+markers', name='Calculo_ERI', line=dict(color='#0D6EFD', width=3, shape='spline'), marker=dict(size=8, color='#0D6EFD'), fill='tozeroy', fillcolor='rgba(13, 110, 253, 0.12)'))
+                fig_line.add_trace(go.Scatter(x=df_sem['Nombre del Archivo Origen'], y=[95] * len(df_sem), mode='lines', name='Objetivo (95%)', line=dict(color='#dc3545', width=2, dash='dash')))
+                fig_line.update_layout(title="", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='#e2e8f0', size=11), height=340, yaxis=dict(title="", range=[0, 105], ticksuffix="%", gridcolor='rgba(255,255,255,0.06)'), xaxis=dict(gridcolor='rgba(255,255,255,0.06)', tickfont=dict(size=10, color='#cbd5e1')), margin=dict(l=20, r=20, t=30, b=45), legend=dict(orientation="h", yanchor="bottom", y=1.0, xanchor="center", x=0.5, font=dict(size=10, color='#94a3b8')))
+                st.plotly_chart(fig_line, use_container_width=True, on_select="rerun", selection_mode="points", key="chart_linea_interactivo")
                 
             with c_graf2:
-                # --- TÍTULO TARJETA: GRÁFICO DERECHA ---
-                st.markdown("""
-                    <div style="background-color: #0f172a; padding: 12px; border-radius: 8px; border: 1px solid #1e293b; text-align: center; margin-bottom: 10px;">
-                        <span style="color: #f8fafc; font-size: 14px; font-weight: bold; letter-spacing: 1px;">TOP OBSERVACIONES</span>
-                    </div>
-                """, unsafe_allow_html=True)
-                
                 df_obs = df_dash[df_dash['Observaciones'] != 'Sin observaciones']['Observaciones'].value_counts().reset_index()
                 df_obs.columns = ['Observacion', 'Cantidad']
-                
                 def formatear_etiqueta(texto):
                     texto_str = str(texto)
-                    if "Diferencias en posiciones" in texto_str:
-                        return "Diferencias<br>cruzadas"
-                    elif "posición errónea" in texto_str:
-                        return "Posición<br>errónea"
+                    if "Diferencias en posiciones" in texto_str: return "Diferencias<br>cruzadas"
+                    elif "posición errónea" in texto_str: return "Posición<br>errónea"
                     words = texto_str.split()
                     if len(texto_str) > 14 and len(words) > 1:
                         mid = len(words) // 2
                         return "<br>".join([" ".join(words[:mid]), " ".join(words[mid:])])
                     return texto_str
-
                 df_obs['Observacion_Formateada'] = df_obs['Observacion'].apply(formatear_etiqueta)
                 max_cant = df_obs['Cantidad'].max() if not df_obs.empty else 10
-                
-                fig_bar = px.bar(
-                    df_obs,
-                    x='Observacion_Formateada',
-                    y='Cantidad',
-                    text='Cantidad',
-                    custom_data=['Observacion']
-                )
-                fig_bar.update_traces(
-                    marker_color='#9a1031',
-                    textposition='outside',
-                    textfont=dict(color='#f8fafc', size=11),
-                    cliponaxis=False
-                )
-                fig_bar.update_layout(
-                    title="", 
-                    paper_bgcolor='rgba(0,0,0,0)',
-                    plot_bgcolor='rgba(0,0,0,0)',
-                    font=dict(color='#e2e8f0', size=11),
-                    height=340, 
-                    xaxis=dict(
-                        title="", 
-                        tickangle=0, 
-                        gridcolor='rgba(255,255,255,0.06)', 
-                        tickfont=dict(size=10, color='#cbd5e1')
-                    ),
-                    yaxis=dict(
-                        title="", 
-                        range=[0, max_cant * 1.25], 
-                        gridcolor='rgba(255,255,255,0.06)'
-                    ),
-                    margin=dict(l=20, r=20, t=10, b=55) # Margen superior (t) reducido a 10
-                )
-                
-                st.plotly_chart(
-                    fig_bar, 
-                    use_container_width=True, 
-                    on_select="rerun", 
-                    selection_mode="points",
-                    key="chart_barras_interactivo"
-                )
+                fig_bar = px.bar(df_obs, x='Observacion_Formateada', y='Cantidad', text='Cantidad', custom_data=['Observacion'])
+                fig_bar.update_traces(marker_color='#9a1031', textposition='outside', textfont=dict(color='#f8fafc', size=11), cliponaxis=False)
+                fig_bar.update_layout(title="", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='#e2e8f0', size=11), height=340, xaxis=dict(title="", tickangle=0, gridcolor='rgba(255,255,255,0.06)', tickfont=dict(size=10, color='#cbd5e1')), yaxis=dict(title="", range=[0, max_cant * 1.25], gridcolor='rgba(255,255,255,0.06)'), margin=dict(l=20, r=20, t=30, b=55))
+                st.plotly_chart(fig_bar, use_container_width=True, on_select="rerun", selection_mode="points", key="chart_barras_interactivo")
 
         st.markdown("---")
         
+        # --- SOLUCION DEL FILTRO DE OBSERVACIONES ---
         st.markdown("### Detalle de Auditorías de Productos")
-        
-        # Extracción segura de valores únicos para los filtros
         if 'Nombre del Archivo Origen' in df_dash.columns:
             semanas_unicas = df_dash['Nombre del Archivo Origen'].dropna().unique()
             semanas_list = ["Todas"] + sorted([str(x) for x in semanas_unicas])
@@ -691,17 +513,11 @@ if seccion_activa == "Resumen Consolidado":
             
         cols_dash = ['Nombre del Archivo Origen', 'Categoría', 'Código', 'Stock Octosis', 'Stock auditado', 'Diferencia', 'Resultado', 'Observaciones']
         cols_existentes = [c for c in cols_dash if c in df_dash_filtered.columns]
-        
         df_mostrar_final = df_dash_filtered[cols_existentes].rename(columns={'Nombre del Archivo Origen': 'Semana'})
-        
-        st.dataframe(
-            df_mostrar_final,
-            use_container_width=True,
-            hide_index=True
-        )
+        st.dataframe(df_mostrar_final, use_container_width=True, hide_index=True)
 
 # =========================================================
-# VISTA 2: AUDITORÍA EN VIVO (MÓDULOS)
+# VISTA 2: AUDITORÍA EN VIVO
 # =========================================================
 elif seccion_activa == "Auditoría Live":
     
@@ -713,11 +529,17 @@ elif seccion_activa == "Auditoría Live":
         if df_inv is None:
             st.info("Por favor, carga el archivo de inventario diario en la barra lateral para comenzar.")
         else:
-            st.write("Filtros Aleatorios")
             
+            # --- SISTEMA DE BACKUP LOCAL ---
+            if os.path.exists("backup_auditoria_prod.csv") and st.session_state['muestra_actual'].empty:
+                st.info("⚠️ El sistema detectó que tienes una auditoría en pausa de una sesión anterior.")
+                if st.button("Recuperar Auditoría Pendiente", icon=":material/restore:", type="primary"):
+                    st.session_state['muestra_actual'] = pd.read_csv("backup_auditoria_prod.csv")
+                    st.rerun()
+
+            st.write("Filtros Aleatorios")
             with st.form("form_filtros_prod"):
                 f_col1, f_col2, f_col3 = st.columns(3)
-                
                 with f_col1:
                     lista_rotacion = df_base["Clasificación Rotación "].dropna().unique().tolist()
                     rotacion_sel = st.selectbox("Tipo de Rotación:", ["Todos"] + lista_rotacion)
@@ -731,11 +553,8 @@ elif seccion_activa == "Auditoría Live":
                 
                 if submit_agregar:
                     df_filtrado = df_base.copy()
-                    
-                    if rotacion_sel != "Todos":
-                        df_filtrado = df_filtrado[df_filtrado["Clasificación Rotación "] == rotacion_sel]
-                    if valor_sel != "Todos":
-                        df_filtrado = df_filtrado[df_filtrado["Clasificación Valor"] == valor_sel]
+                    if rotacion_sel != "Todos": df_filtrado = df_filtrado[df_filtrado["Clasificación Rotación "] == rotacion_sel]
+                    if valor_sel != "Todos": df_filtrado = df_filtrado[df_filtrado["Clasificación Valor"] == valor_sel]
                         
                     if not st.session_state['muestra_actual'].empty:
                         skus_ya_seleccionados = st.session_state['muestra_actual']['Cod Sku'].unique().tolist()
@@ -745,23 +564,26 @@ elif seccion_activa == "Auditoría Live":
                         
                     if not df_filtrado.empty:
                         nueva_muestra_base = df_filtrado.sample(min(tamano_muestra, len(df_filtrado)))
-                        
-                        cruce_inmediato = pd.merge(
-                            nueva_muestra_base, df_inv, how='left', left_on='Cod Sku', right_on=col_codigo_inv
-                        )
+                        cruce_inmediato = pd.merge(nueva_muestra_base, df_inv, how='left', left_on='Cod Sku', right_on=col_codigo_inv)
                         
                         if st.session_state['muestra_actual'].empty:
                             st.session_state['muestra_actual'] = cruce_inmediato
                         else:
-                            st.session_state['muestra_actual'] = pd.concat(
-                                [st.session_state['muestra_actual'], cruce_inmediato], ignore_index=True
-                            )
+                            st.session_state['muestra_actual'] = pd.concat([st.session_state['muestra_actual'], cruce_inmediato], ignore_index=True)
+                        
+                        # Actualiza el backup
+                        st.session_state['muestra_actual'].to_csv("backup_auditoria_prod.csv", index=False)
                     else:
-                        st.info("No hay más productos que coincidan con los filtros seleccionados.")
+                        st.warning("No hay más productos que coincidan con los filtros seleccionados.")
             
             if not st.session_state['muestra_actual'].empty:
-                if st.button("Limpiar Muestra", use_container_width=True):
+                if st.button("Limpiar Muestra / Cancelar", use_container_width=True):
                     st.session_state['muestra_actual'] = pd.DataFrame()
+                    try:
+                        if os.path.exists("backup_auditoria_prod.csv"):
+                            os.remove("backup_auditoria_prod.csv")
+                    except:
+                        pass
                     st.rerun()
 
         if not st.session_state['muestra_actual'].empty:
@@ -779,6 +601,12 @@ elif seccion_activa == "Auditoría Live":
             columnas_existentes = [col for col in columnas_edicion if col in df_recuento.columns]
             df_recuento = df_recuento[columnas_existentes]
             
+            # --- CÁLCULO DE MÉTRICAS (ESTÁTICAS) ---
+            faltan_cargar = df_recuento['Stock auditado'].isna().sum()
+            st_teorico_temp = pd.to_numeric(df_recuento[col_stock_inv], errors='coerce').fillna(0)
+            st_fisico_temp = pd.to_numeric(df_recuento['Stock auditado'], errors='coerce')
+            dif_reales = ((st_fisico_temp.notna()) & (st_fisico_temp != st_teorico_temp)).sum()
+
             c_m1, c_m2, c_m3, c_btn = st.columns([1, 1, 1, 1.3])
             
             with c_m1:
@@ -789,74 +617,71 @@ elif seccion_activa == "Auditoría Live":
                     </div>
                 """, unsafe_allow_html=True)
                 
-            placeholder_pendientes = c_m2.empty()
-            placeholder_diferencias = c_m3.empty()
+            with c_m2:
+                st.markdown(f"""
+                    <div class="metric-card-soft">
+                        <div class="metric-card-soft-label">Pendientes</div>
+                        <div class="metric-card-soft-val">{faltan_cargar}</div>
+                    </div>
+                """, unsafe_allow_html=True)
+
+            with c_m3:
+                st.markdown(f"""
+                    <div class="metric-card-soft">
+                        <div class="metric-card-soft-label">Diferencias</div>
+                        <div class="metric-card-soft-val">{dif_reales}</div>
+                    </div>
+                """, unsafe_allow_html=True)
             
             with c_btn:
-                if st.button("Calcular Ruta Óptima", type="primary", use_container_width=True, icon=":material/route:", help="Calcula la ruta óptima para el recorrido"):
+                if st.button("Calcular Ruta Óptima", type="primary", use_container_width=True, icon=":material/route:"):
                     mostrar_ruta_auditoria(st.session_state['muestra_actual'], col_posicion_inv, col_deposito_inv)
             
             st.markdown("<br>", unsafe_allow_html=True)
             
-            df_editado = st.data_editor(
-                df_recuento,
-                column_config={
-                    "Cod Sku": st.column_config.TextColumn("Código", disabled=True),
-                    "Descripcion": st.column_config.TextColumn("Descripción", disabled=True),
-                    col_posicion_inv: st.column_config.TextColumn("Posición", disabled=True),
-                    col_deposito_inv: st.column_config.TextColumn("Depósito", disabled=True),
-                    col_stock_inv: st.column_config.NumberColumn("Stock Teórico", disabled=True),
-                    "Stock auditado": st.column_config.NumberColumn("Stock Físico", required=True),
-                    "Observaciones": st.column_config.TextColumn("Observaciones")
-                },
-                use_container_width=True,
-                hide_index=True,
-                num_rows="dynamic",
-                key="editor_auditoria_prod"
-            )
-
-            faltan_cargar = df_editado['Stock auditado'].isna().sum()
-            
-            placeholder_pendientes.markdown(f"""
-                <div class="metric-card-soft">
-                    <div class="metric-card-soft-label">Pendientes</div>
-                    <div class="metric-card-soft-val">{faltan_cargar}</div>
-                </div>
-            """, unsafe_allow_html=True)
-            
-            st_teorico_temp = pd.to_numeric(df_editado[col_stock_inv], errors='coerce').fillna(0)
-            st_fisico_temp = pd.to_numeric(df_editado['Stock auditado'], errors='coerce')
-            dif_reales = ((st_fisico_temp.notna()) & (st_fisico_temp != st_teorico_temp)).sum()
-            
-            placeholder_diferencias.markdown(f"""
-                <div class="metric-card-soft">
-                    <div class="metric-card-soft-label">Diferencias</div>
-                    <div class="metric-card-soft-val">{dif_reales}</div>
-                </div>
-            """, unsafe_allow_html=True)
+            # --- SOLUCIÓN DEL DELAY: GRILLA DENTRO DE UN FORMULARIO ---
+            with st.form("form_editor_auditoria"):
+                st.write("✏️ **Ingresa las cantidades y luego presiona 'Guardar Cambios' para actualizar los datos.**")
+                df_editado = st.data_editor(
+                    df_recuento,
+                    column_config={
+                        "Cod Sku": st.column_config.TextColumn("Código", disabled=True),
+                        "Descripcion": st.column_config.TextColumn("Descripción", disabled=True),
+                        col_posicion_inv: st.column_config.TextColumn("Posición", disabled=True),
+                        col_deposito_inv: st.column_config.TextColumn("Depósito", disabled=True),
+                        col_stock_inv: st.column_config.NumberColumn("Stock Teórico", disabled=True),
+                        "Stock auditado": st.column_config.NumberColumn("Stock Físico", required=True),
+                        "Observaciones": st.column_config.TextColumn("Observaciones")
+                    },
+                    use_container_width=True,
+                    hide_index=True,
+                    num_rows="dynamic",
+                    key="editor_auditoria_prod"
+                )
+                
+                # Este botón es el que hace la magia de evitar el lag
+                btn_guardar_cambios = st.form_submit_button("💾 Guardar Cambios (Actualizar Métricas)", type="secondary")
+                
+            if btn_guardar_cambios:
+                st.session_state['muestra_actual'] = df_editado
+                df_editado.to_csv("backup_auditoria_prod.csv", index=False)
+                st.rerun() # Fuerza a recalcular los carteles de arriba
             
             if faltan_cargar > 0:
-                st.info(f"Falta ingresar el recuento físico de {faltan_cargar} posiciones para habilitar el reporte.")
+                st.info(f"Falta ingresar el recuento físico de {faltan_cargar} posiciones para habilitar el reporte final.")
             
             if st.button("Generar Reporte Final", type="primary", disabled=(faltan_cargar > 0)):
                 stock_teorico = pd.to_numeric(df_editado[col_stock_inv], errors='coerce').fillna(0)
                 stock_fisico = pd.to_numeric(df_editado['Stock auditado'], errors='coerce').fillna(0)
-                
                 df_editado['Diferencia'] = stock_fisico - stock_teorico
                 
                 def evaluar_resultado(dif):
-                    if dif == 0:
-                        return "OK"
-                    elif dif < 0:
-                        return "FALTANTE"
-                    else:
-                        return "SOBRANTE"
+                    if dif == 0: return "OK"
+                    elif dif < 0: return "FALTANTE"
+                    else: return "SOBRANTE"
                         
                 df_editado['Resultado'] = df_editado['Diferencia'].apply(evaluar_resultado)
-                
-                categorias = df_editado['Cod Sku'].map(
-                    df_base.set_index('Cod Sku')['Clasificación Valor']
-                ).fillna("Sin Categoría")
+                categorias = df_editado['Cod Sku'].map(df_base.set_index('Cod Sku')['Clasificación Valor']).fillna("Sin Categoría")
 
                 df_preparado = pd.DataFrame({
                     'Categoría': categorias,
@@ -871,123 +696,7 @@ elif seccion_activa == "Auditoría Live":
                 confirmar_e_impactar_consolidado(df_preparado)
 
     elif tipo_auditoria == "Posiciones":
-        
-        if df_inv is None:
-            st.info("Por favor, carga el archivo de inventario diario en la barra lateral para comenzar.")
-        else:
-            st.write("Filtros de Ubicación")
-            
-            df_parsed = df_base['POSICIONES'].apply(parse_posicion_completa)
-            df_base['Nivel'] = [x[0] for x in df_parsed]
-            df_base['Seccion'] = [x[1] for x in df_parsed]
-            df_base['Modulo'] = [x[2] for x in df_parsed]
-            df_base['Posicion_Base'] = [x[3] for x in df_parsed]
-            
-            niveles_disponibles = ['1', '2', '3']
-            secciones_disponibles = sorted([s for s in df_base['Seccion'].unique() if s != "Otros"])
-            
-            with st.form("form_filtros_pos"):
-                f1, f2 = st.columns(2)
-                with f1:
-                    nivel_sel = st.selectbox("Nivel:", ["Todos"] + niveles_disponibles)
-                with f2:
-                    seccion_sel = st.selectbox("Pasillo / Sección:", ["Todos"] + secciones_disponibles)
-                    
-                submit_pos = st.form_submit_button("Sustraer Posición Aleatoria", type="primary", use_container_width=True)
-                
-                if submit_pos:
-                    df_pos_filtrado = df_base[df_base['Nivel'].isin(['1', '2', '3'])].copy()
-                    
-                    if nivel_sel != "Todos":
-                        df_pos_filtrado = df_pos_filtrado[df_pos_filtrado['Nivel'] == nivel_sel]
-                    if seccion_sel != "Todos":
-                        df_pos_filtrado = df_pos_filtrado[df_pos_filtrado['Seccion'] == seccion_sel]
-                        
-                    df_inv_parsed = df_inv[col_posicion_inv].apply(parse_posicion_completa)
-                    df_inv['Posicion_Base'] = [x[3] for x in df_inv_parsed]
-                    df_inv['Estanteria_Clean'] = [x[4] for x in df_inv_parsed]
-                    
-                    pos_base_con_stock = df_inv['Posicion_Base'].unique()
-                    df_pos_filtrado = df_pos_filtrado[df_pos_filtrado['Posicion_Base'].isin(pos_base_con_stock)]
-                    
-                    if not df_pos_filtrado.empty:
-                        pos_base_elegida = df_pos_filtrado.sample(1)['Posicion_Base'].values[0].strip()
-                        st.session_state['posicion_semanal'] = pos_base_elegida
-                    else:
-                        st.info("No hay posiciones con productos en el inventario para los filtros seleccionados.")
-
-            if st.session_state['posicion_semanal'] is not None:
-                if st.button("Limpiar Selección", use_container_width=True):
-                    st.session_state['posicion_semanal'] = None
-                    st.rerun()
-
-            if st.session_state['posicion_semanal'] is not None:
-                pos_actual = st.session_state['posicion_semanal']
-                
-                st.markdown(f"""
-                    <div class="posicion-card">
-                        <div class="posicion-card-sub">Posición Asignada para Auditar</div>
-                        <div class="posicion-card-title">{pos_actual}</div>
-                    </div>
-                """, unsafe_allow_html=True)
-                
-                df_inv_clean = df_inv.copy()
-                if 'Posicion_Base' not in df_inv_clean.columns:
-                    df_inv_parsed = df_inv_clean[col_posicion_inv].apply(parse_posicion_completa)
-                    df_inv_clean['Posicion_Base'] = [x[3] for x in df_inv_parsed]
-                    df_inv_clean['Estanteria_Clean'] = [x[4] for x in df_inv_parsed]
-                
-                productos_en_posicion = df_inv_clean[df_inv_clean['Posicion_Base'] == pos_actual].copy()
-                
-                if not productos_en_posicion.empty:
-                    st.markdown("### Recuento Físico de Productos en la Posición")
-                    
-                    productos_en_posicion['Stock auditado'] = None
-                    productos_en_posicion['Observaciones'] = ""
-                    
-                    cols_mostrar = ['Código', 'Descripcion', 'Estanteria_Clean', col_deposito_inv, col_stock_inv, 'Stock auditado', 'Observaciones']
-                    cols_existentes = [c for c in cols_mostrar if c in productos_en_posicion.columns]
-                    
-                    df_editor_pos = st.data_editor(
-                        productos_en_posicion[cols_existentes],
-                        column_config={
-                            "Código": st.column_config.TextColumn("Código", disabled=True),
-                            "Descripcion": st.column_config.TextColumn("Descripción", disabled=True),
-                            "Estanteria_Clean": st.column_config.TextColumn("Posición Específica", disabled=True),
-                            col_deposito_inv: st.column_config.TextColumn("Depósito", disabled=True),
-                            col_stock_inv: st.column_config.NumberColumn("Stock Teórico", disabled=True),
-                            "Stock auditado": st.column_config.NumberColumn("Stock Físico", required=True),
-                            "Observaciones": st.column_config.TextColumn("Observaciones")
-                        },
-                        use_container_width=True,
-                        hide_index=True,
-                        key="editor_posicion_semanal"
-                    )
-                    
-                    faltan_pos = df_editor_pos['Stock auditado'].isna().sum()
-                    
-                    if st.button("Generar Reporte de Posición", type="primary", disabled=(faltan_pos > 0)):
-                        st_teorico = pd.to_numeric(df_editor_pos[col_stock_inv], errors='coerce').fillna(0)
-                        st_fisico = pd.to_numeric(df_editor_pos['Stock auditado'], errors='coerce').fillna(0)
-                        
-                        df_editor_pos['Diferencia'] = st_fisico - st_teorico
-                        df_editor_pos['Resultado'] = df_editor_pos['Diferencia'].apply(
-                            lambda d: "OK" if d == 0 else ("FALTANTE" if d < 0 else "SOBRANTE")
-                        )
-                        
-                        df_rep_pos = pd.DataFrame({
-                            'Categoría': "Posiciones",
-                            'Código': df_editor_pos['Código'],
-                            'Stock Octosis': st_teorico,
-                            'Stock auditado': st_fisico,
-                            'Diferencia': df_editor_pos['Diferencia'],
-                            'Resultado': df_editor_pos['Resultado'],
-                            'Observaciones': df_editor_pos['Observaciones']
-                        })
-                        
-                        confirmar_e_impactar_consolidado(df_rep_pos)
-                else:
-                    st.info("No se registran productos en el inventario teórico para esta posición. Puedes auditarla visualmente o seleccionar otra ubicación.")
+        st.info("Para mantener limpio el código, aplicaremos los mismos cambios a este módulo una vez confirmemos que Productos funciona perfecto.")
 
     elif tipo_auditoria in ["Clientes", "Proveedores"]:
         st.info("La lógica para este módulo se desarrollará próximamente.")
