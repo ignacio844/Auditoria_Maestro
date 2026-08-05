@@ -355,42 +355,58 @@ col_stock_inv = "Saldo"
 col_posicion_inv = "Estanteria"
 col_deposito_inv = "Deposito"
 
-ID_GOOGLE_DRIVE = "1cxjiOrp-3ze99r-bPTU1OVEGGOMkRABwWzgkIHpC1Nw"
+# Campo de texto para pegar el enlace o ID del archivo diario en Drive
+drive_input = st.sidebar.text_input(
+    "Enlace o ID de Drive (Inventario del día):",
+    placeholder="Pega aquí el link de compartir...",
+    key="input_drive_diario"
+)
+
+archivo_inventario = st.sidebar.file_uploader(
+    "O sube el archivo manualmente (opcional):", 
+    type=["xlsx", "xls", "csv"], 
+    key="uploader_sidebar_global"
+)
+
 df_inv = None
 
-if ID_GOOGLE_DRIVE != "1cxjiOrp-3ze99r-bPTU1OVEGGOMkRABwWzgkIHpC1Nw":
+def extraer_id_drive(texto):
+    if not texto: return None
+    match = re.search(r'[-\w]{25,}', texto)
+    return match.group(0) if match else texto.strip()
+
+id_drive_extraido = extraer_id_drive(drive_input)
+
+# 1. Prioridad: Carga por Google Drive mediante enlace/ID
+if id_drive_extraido:
     try:
-        url_drive = f'https://drive.google.com/uc?id={ID_GOOGLE_DRIVE}'
-        df_inv_bruto = pd.read_excel(url_drive)
+        url_drive_directa = f'https://drive.google.com/uc?export=download&id={id_drive_extraido}'
+        df_inv_bruto = pd.read_excel(url_drive_directa)
         df_inv = df_inv_bruto[~df_inv_bruto[col_deposito_inv].astype(str).str.contains('REV|EXT', case=False, na=False)]
         st.session_state['inventario_cargado'] = df_inv
-        st.sidebar.success("Sincronizado con Google Drive", icon=":material/check_circle:")
+        st.sidebar.success("Conectado a Google Drive.", icon=":material/check_circle:")
     except Exception as e:
-        st.sidebar.warning("Error al conectar con Drive. Utiliza la carga manual.", icon=":material/warning:")
+        st.sidebar.error("No se pudo leer el archivo de Drive. Revisa que el enlace sea público ('Cualquier persona con el enlace').", icon=":material/error:")
+        df_inv = None
 
-archivo_inventario = st.sidebar.file_uploader("Sube el archivo de Stock (Excel/CSV):", type=["xlsx", "xls", "csv"], key="uploader_sidebar_global")
+# 2. Segunda opción: Carga manual
+elif archivo_inventario is not None:
+    try:
+        if archivo_inventario.name.endswith('.csv'):
+            df_inv_bruto = pd.read_csv(archivo_inventario)
+        else:
+            df_inv_bruto = pd.read_excel(archivo_inventario)
+        
+        df_inv = df_inv_bruto[~df_inv_bruto[col_deposito_inv].astype(str).str.contains('REV|EXT', case=False, na=False)]
+        st.session_state['inventario_cargado'] = df_inv
+        st.sidebar.success("Inventario manual cargado.", icon=":material/check_circle:")
+    except Exception as e:
+        st.sidebar.error(f"Error de lectura: {e}", icon=":material/error:")
+        df_inv = None
 
-if archivo_inventario is not None:
-    if 'nombre_archivo_cargado' not in st.session_state or st.session_state['nombre_archivo_cargado'] != archivo_inventario.name:
-        try:
-            if archivo_inventario.name.endswith('.csv'):
-                df_inv_bruto = pd.read_csv(archivo_inventario)
-            else:
-                df_inv_bruto = pd.read_excel(archivo_inventario)
-            
-            df_inv = df_inv_bruto[~df_inv_bruto[col_deposito_inv].astype(str).str.contains('REV|EXT', case=False, na=False)]
-            st.session_state['inventario_cargado'] = df_inv
-            st.session_state['nombre_archivo_cargado'] = archivo_inventario.name
-            st.sidebar.success("Inventario procesado con éxito.", icon=":material/check_circle:")
-        except Exception as e:
-            st.sidebar.error(f"Error de lectura: {e}", icon=":material/error:")
-            df_inv = None
-    else:
-        df_inv = st.session_state['inventario_cargado']
+# 3. Mantenimiento en memoria de sesión
 elif 'inventario_cargado' in st.session_state:
     df_inv = st.session_state['inventario_cargado']
-else:
-    df_inv = None
 
 archivos_auditoria = {
     "Productos": "Auditoría_Aleatoria_Productos.csv",
