@@ -635,15 +635,16 @@ elif seccion_activa == "Auditoría Live":
             df_recuento = df_recuento[columnas_existentes]
             
            # --- CÁLCULO DE MÉTRICAS (ESTÁTICAS) ---
-            faltan_cargar = df_recuento['Stock auditado'].isna().sum()
+            # Contamos cuántos códigos únicos tienen al menos una celda vacía
+            pendientes_codigos = df_recuento[df_recuento['Stock auditado'].isna()]['Cod Sku'].nunique()
+            pendientes_filas = df_recuento['Stock auditado'].isna().sum() # Control interno de filas
+            
             st_teorico_temp = pd.to_numeric(df_recuento[col_stock_inv], errors='coerce').fillna(0)
             st_fisico_temp = pd.to_numeric(df_recuento['Stock auditado'], errors='coerce')
             dif_reales = ((st_fisico_temp.notna()) & (st_fisico_temp != st_teorico_temp)).sum()
             
-            # NUEVO: Cálculo de códigos únicos
             codigos_unicos = df_recuento['Cod Sku'].nunique()
 
-            # Ajustamos a 5 columnas (4 métricas + 1 botón)
             c_m1, c_m2, c_m3, c_m4, c_btn = st.columns([1, 1, 1, 1, 1.4])
             
             with c_m1: 
@@ -651,7 +652,7 @@ elif seccion_activa == "Auditoría Live":
             with c_m2: 
                 st.markdown(f"""<div class="metric-card-soft"><div class="metric-card-soft-label">Códigos Únicos</div><div class="metric-card-soft-val">{codigos_unicos}</div></div>""", unsafe_allow_html=True)
             with c_m3: 
-                st.markdown(f"""<div class="metric-card-soft"><div class="metric-card-soft-label">Pendientes</div><div class="metric-card-soft-val">{faltan_cargar}</div></div>""", unsafe_allow_html=True)
+                st.markdown(f"""<div class="metric-card-soft"><div class="metric-card-soft-label">Pendientes</div><div class="metric-card-soft-val">{pendientes_codigos}</div></div>""", unsafe_allow_html=True)
             with c_m4: 
                 st.markdown(f"""<div class="metric-card-soft"><div class="metric-card-soft-label">Diferencias</div><div class="metric-card-soft-val">{dif_reales}</div></div>""", unsafe_allow_html=True)
             
