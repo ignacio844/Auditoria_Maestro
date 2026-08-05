@@ -718,7 +718,10 @@ elif seccion_activa == "Auditoría Live":
                         st.success("Borrador guardado en Google Sheets.", icon=":material/check_circle:")
                 st.rerun()
             
-            if st.button("Generar Reporte Final", type="primary", icon=":material/assignment_turned_in:", disabled=(faltan_cargar > 0)):
+            if pendientes_filas > 0:
+                st.info(f"Faltan auditar {pendientes_codigos} código(s) para habilitar el reporte final.", icon=":material/info:")
+            
+            if st.button("Generar Reporte Final", type="primary", icon=":material/assignment_turned_in:", disabled=(pendientes_filas > 0)):
                 stock_teorico = pd.to_numeric(df_editado[col_stock_inv], errors='coerce').fillna(0)
                 stock_fisico = pd.to_numeric(df_editado['Stock auditado'], errors='coerce').fillna(0)
                 df_editado['Diferencia'] = stock_fisico - stock_teorico
