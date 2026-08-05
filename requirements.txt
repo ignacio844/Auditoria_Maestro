@@ -3,3 +3,4 @@ pandas
 plotly
 openpyxl
 st-gsheets-connection
+starlette<1.4.0
