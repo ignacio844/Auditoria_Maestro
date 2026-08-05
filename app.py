@@ -355,12 +355,29 @@ col_stock_inv = "Saldo"
 col_posicion_inv = "Estanteria"
 col_deposito_inv = "Deposito"
 
-# Campo de texto para pegar el enlace o ID del archivo diario en Drive
+def extraer_id_drive(texto):
+    if not texto: return None
+    match = re.search(r'[-\w]{25,}', texto)
+    return match.group(0) if match else texto.strip()
+
+# 1. Recupera el ID directamente de la URL si existe tras un F5
+id_guardado_url = st.query_params.get("drive_id", "")
+
+# 2. Input pre-rellenado con la URL/ID recordado
 drive_input = st.sidebar.text_input(
     "Enlace o ID de Drive (Inventario del día):",
+    value=id_guardado_url,
     placeholder="Pega aquí el link de compartir...",
     key="input_drive_diario"
 )
+
+id_drive_extraido = extraer_id_drive(drive_input)
+
+# 3. Guarda el ID en la URL del navegador para sobrevivir a refrescos
+if id_drive_extraido:
+    st.query_params["drive_id"] = id_drive_extraido
+elif "drive_id" in st.query_params and not drive_input:
+    del st.query_params["drive_id"]
 
 archivo_inventario = st.sidebar.file_uploader(
     "O sube el archivo manualmente (opcional):", 
@@ -370,26 +387,18 @@ archivo_inventario = st.sidebar.file_uploader(
 
 df_inv = None
 
-def extraer_id_drive(texto):
-    if not texto: return None
-    match = re.search(r'[-\w]{25,}', texto)
-    return match.group(0) if match else texto.strip()
-
-id_drive_extraido = extraer_id_drive(drive_input)
-
-# 1. Prioridad: Carga por Google Drive mediante enlace/ID
+# Carga desde Google Drive mediante URL guardada
 if id_drive_extraido:
     try:
         url_drive_directa = f'https://drive.google.com/uc?export=download&id={id_drive_extraido}'
         df_inv_bruto = pd.read_excel(url_drive_directa)
         df_inv = df_inv_bruto[~df_inv_bruto[col_deposito_inv].astype(str).str.contains('REV|EXT', case=False, na=False)]
         st.session_state['inventario_cargado'] = df_inv
-        st.sidebar.success("Conectado a Google Drive.", icon=":material/check_circle:")
+        st.sidebar.success("Sincronizado con Google Drive.", icon=":material/check_circle:")
     except Exception as e:
-        st.sidebar.error("No se pudo leer el archivo de Drive. Revisa que el enlace sea público ('Cualquier persona con el enlace').", icon=":material/error:")
+        st.sidebar.error("No se pudo leer de Drive. Revisa que el link sea público.", icon=":material/error:")
         df_inv = None
 
-# 2. Segunda opción: Carga manual
 elif archivo_inventario is not None:
     try:
         if archivo_inventario.name.endswith('.csv'):
@@ -404,7 +413,6 @@ elif archivo_inventario is not None:
         st.sidebar.error(f"Error de lectura: {e}", icon=":material/error:")
         df_inv = None
 
-# 3. Mantenimiento en memoria de sesión
 elif 'inventario_cargado' in st.session_state:
     df_inv = st.session_state['inventario_cargado']
 
