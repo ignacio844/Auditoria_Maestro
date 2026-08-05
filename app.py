@@ -8,15 +8,10 @@ import plotly.express as px
 import plotly.graph_objects as go
 from streamlit_gsheets import GSheetsConnection
 
-# Configuración básica de la página
 st.set_page_config(page_title="Sistema de Auditoría de Inventario", layout="wide")
 
-# =========================================================
-# CONFIGURACIÓN DE GOOGLE SHEETS
-# =========================================================
 URL_GOOGLE_SHEETS = "https://docs.google.com/spreadsheets/d/1cxjiOrp-3ze99r-bPTU1OVEGGOMkRABwWzgkIHpC1Nw/edit"
 
-# --- ESTILOS VISUALES CORPORATIVOS ---
 st.markdown("""
     <style>
     [data-testid="stSidebar"] {
@@ -49,11 +44,6 @@ st.markdown("""
     button[kind="primary"]:hover, button[kind="primaryFormSubmit"]:hover {
         background-color: #0b5ed7 !important;
         border-color: #0a58ca !important;
-    }
-    button[title="Calcula la ruta óptima para el recorrido"] {
-        height: 98px !important;
-        border-radius: 8px !important;
-        font-size: 1.15rem !important;
     }
     [data-testid="stForm"] {
         background-color: rgba(13, 110, 253, 0.03);
@@ -158,9 +148,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# =========================================================
-# FUNCIONES AUXILIARES Y DE NUBE
-# =========================================================
 def parse_posicion_completa(p):
     p_clean = re.sub(r'\s+', ' ', str(p).strip())
     m = re.match(r'^(\d+)([A-Za-z]+)\s*/\s*(\d+)\s*(\d+)?$', p_clean)
@@ -176,10 +163,10 @@ def parse_posicion_completa(p):
 def cargar_base_consolidada():
     try:
         conn = st.connection("gsheets", type=GSheetsConnection)
-        df = conn.read(spreadsheet=URL_GOOGLE_SHEETS, worksheet=0) # Lee la primera hoja
+        df = conn.read(spreadsheet=URL_GOOGLE_SHEETS, worksheet=0) 
         return df
     except Exception as e:
-        st.error(f"Error de lectura en Google Sheets: {e}")
+        st.error(f"Error de lectura en Google Sheets: {e}", icon=":material/error:")
         return None
 
 def guardar_borrador_nube(df):
@@ -188,7 +175,7 @@ def guardar_borrador_nube(df):
         conn.update(spreadsheet=URL_GOOGLE_SHEETS, worksheet="Borradores", data=df)
         return True
     except Exception as e:
-        st.error(f"Error al guardar borrador en la nube: {e}")
+        st.error(f"Error al guardar borrador en la nube: {e}", icon=":material/error:")
         return False
 
 def cargar_borrador_nube():
@@ -207,14 +194,15 @@ def vaciar_borrador_nube():
     except:
         pass
 
-# =========================================================
-# MODALES EMERGENTES
-# =========================================================
-@st.dialog("Ruta Óptima de Auditoría y Recuento", width="large")
+@st.dialog("Ruta Óptima de Auditoría", width="large")
 def mostrar_ruta_auditoria(df, col_pos, col_dep, col_stock):
-    st.write("Sigue este orden para minimizar tus pasos. **Puedes ingresar el recuento físico aquí mismo.**")
     df_ruta = df.copy()
     
+    if 'Stock auditado' not in df_ruta.columns:
+        df_ruta['Stock auditado'] = None
+    if 'Observaciones' not in df_ruta.columns:
+        df_ruta['Observaciones'] = ""
+        
     def obtener_nivel_seccion(pos):
         pos_str = str(pos).strip()
         match = re.match(r'^(\d+)([A-Za-z]+)', pos_str)
@@ -255,11 +243,11 @@ def mostrar_ruta_auditoria(df, col_pos, col_dep, col_stock):
         
         c1, c2, c3 = st.columns([1, 1, 1])
         with c1:
-            aplicar_local = st.form_submit_button("💾 Aplicar Cambios", type="secondary", use_container_width=True)
+            aplicar_local = st.form_submit_button("Aplicar Cambios", icon=":material/save:", type="secondary", use_container_width=True)
         with c2:
-            guardar_nube = st.form_submit_button("☁️ Guardar Nube (Anti-Caídas)", type="primary", use_container_width=True)
+            guardar_nube = st.form_submit_button("Guardar en Nube", icon=":material/cloud_sync:", type="primary", use_container_width=True)
         with c3:
-            cerrar = st.form_submit_button("Cerrar Ventana", use_container_width=True)
+            cerrar = st.form_submit_button("Cerrar Ventana", icon=":material/close:", use_container_width=True)
             
     if aplicar_local or guardar_nube:
         df_main = st.session_state['muestra_actual'].copy()
@@ -270,16 +258,14 @@ def mostrar_ruta_auditoria(df, col_pos, col_dep, col_stock):
         
         if guardar_nube:
             if guardar_borrador_nube(st.session_state['muestra_actual']):
-                st.success("¡Progreso asegurado en Google Sheets!")
+                st.success("Borrador actualizado exitosamente.", icon=":material/check_circle:")
         st.rerun()
         
     if cerrar:
         st.rerun()
 
-@st.dialog("Confirmación e Impacto en Base Consolidada", width="large")
+@st.dialog("Confirmación e Impacto", width="large")
 def confirmar_e_impactar_consolidado(df_preparado):
-    st.write("Revisa los resultados obtenidos. Puedes corregir manualmente el **Resultado** o las **Observaciones** antes de guardar.")
-    
     semana_sugerida = "SEMANA 31"
     df_actual_cons = cargar_base_consolidada()
     if df_actual_cons is not None and 'Nombre del Archivo Origen' in df_actual_cons.columns:
@@ -287,7 +273,7 @@ def confirmar_e_impactar_consolidado(df_preparado):
         if semanas_existentes:
             semana_sugerida = str(semanas_existentes[-1])
 
-    semana_ingresada = st.text_input("Etiqueta de Semana / Identificador:", value=semana_sugerida)
+    semana_ingresada = st.text_input("Identificador Semanal:", value=semana_sugerida)
     df_validar = df_preparado.copy()
     
     df_confirmado = st.data_editor(
@@ -308,7 +294,7 @@ def confirmar_e_impactar_consolidado(df_preparado):
     
     c_modal1, c_modal2 = st.columns(2)
     with c_modal1:
-        if st.button("✅ Confirmar y Guardar en Base", type="primary", use_container_width=True):
+        if st.button("Confirmar y Guardar", icon=":material/check_circle:", type="primary", use_container_width=True):
             df_confirmado["Nombre del Archivo Origen"] = semana_ingresada
             cols_base = ['Nombre del Archivo Origen', 'Categoría', 'Código', 'Stock Octosis', 'Stock auditado', 'Diferencia', 'Resultado', 'Observaciones']
             df_para_anexar = df_confirmado[[c for c in cols_base if c in df_confirmado.columns]].copy()
@@ -325,29 +311,23 @@ def confirmar_e_impactar_consolidado(df_preparado):
                     df_para_anexar["Tipo de Auditoría"] = tipo_auditoria.upper()
                 
                 df_final_actualizado = pd.concat([df_existente, df_para_anexar], ignore_index=True)
-                
-                # Guarda en la hoja principal
                 conn.update(spreadsheet=URL_GOOGLE_SHEETS, worksheet=0, data=df_final_actualizado)
                 
                 st.cache_data.clear()
                 st.session_state['muestra_actual'] = pd.DataFrame()
                 st.session_state['posicion_semanal'] = None
                 
-                # Limpiamos la nube temporal
                 vaciar_borrador_nube()
                 
-                st.success("¡Datos guardados e impactados con éxito en Google Sheets!")
+                st.success("Datos impactados en Google Sheets.", icon=":material/check_circle:")
                 st.rerun()
             except Exception as e:
-                st.error(f"Error al escribir en Google Sheets: {e}")
+                st.error(f"Error en Google Sheets: {e}", icon=":material/error:")
             
     with c_modal2:
-        if st.button("Cancelar", use_container_width=True):
+        if st.button("Cancelar", icon=":material/cancel:", use_container_width=True):
             st.rerun()
 
-# ---------------------------------------------------------
-# 1. BARRA LATERAL
-# ---------------------------------------------------------
 logo_path = "LOGOAFTERMARKETLS_transparente.png"
 if os.path.exists(logo_path):
     st.sidebar.image(logo_path, use_container_width=True)
@@ -374,7 +354,7 @@ col_stock_inv = "Saldo"
 col_posicion_inv = "Estanteria"
 col_deposito_inv = "Deposito"
 
-ID_GOOGLE_DRIVE = "1cxjiOrp-3ze99r-bPTU1OVEGGOMkRABwWzgkIHpC1Nw"
+ID_GOOGLE_DRIVE = "TU_ID_DE_GOOGLE_DRIVE_AQUI"
 df_inv = None
 
 if ID_GOOGLE_DRIVE != "TU_ID_DE_GOOGLE_DRIVE_AQUI":
@@ -383,9 +363,9 @@ if ID_GOOGLE_DRIVE != "TU_ID_DE_GOOGLE_DRIVE_AQUI":
         df_inv_bruto = pd.read_excel(url_drive)
         df_inv = df_inv_bruto[~df_inv_bruto[col_deposito_inv].astype(str).str.contains('REV|EXT', case=False, na=False)]
         st.session_state['inventario_cargado'] = df_inv
-        st.sidebar.success("Sincronizado con Google Drive")
+        st.sidebar.success("Sincronizado con Google Drive", icon=":material/check_circle:")
     except Exception as e:
-        st.sidebar.warning("Error al conectar con Drive. Utiliza la carga manual.")
+        st.sidebar.warning("Error al conectar con Drive. Utiliza la carga manual.", icon=":material/warning:")
 
 archivo_inventario = st.sidebar.file_uploader("Sube el archivo de Stock (Excel/CSV):", type=["xlsx", "xls", "csv"], key="uploader_sidebar_global")
 
@@ -400,9 +380,9 @@ if archivo_inventario is not None:
             df_inv = df_inv_bruto[~df_inv_bruto[col_deposito_inv].astype(str).str.contains('REV|EXT', case=False, na=False)]
             st.session_state['inventario_cargado'] = df_inv
             st.session_state['nombre_archivo_cargado'] = archivo_inventario.name
-            st.sidebar.success("Inventario procesado con éxito.")
+            st.sidebar.success("Inventario procesado con éxito.", icon=":material/check_circle:")
         except Exception as e:
-            st.sidebar.error(f"Error de lectura: {e}")
+            st.sidebar.error(f"Error de lectura: {e}", icon=":material/error:")
             df_inv = None
     else:
         df_inv = st.session_state['inventario_cargado']
@@ -433,7 +413,7 @@ if seccion_activa == "Auditoría Live":
     try:
         df_base = cargar_datos(archivos_auditoria[tipo_auditoria])
     except FileNotFoundError:
-        st.error(f"No se encontró el archivo de base maestra para {tipo_auditoria} en tu repositorio.")
+        st.error(f"No se encontró la base para {tipo_auditoria}.", icon=":material/error:")
         st.stop()
 
 if 'muestra_actual' not in st.session_state:
@@ -441,16 +421,13 @@ if 'muestra_actual' not in st.session_state:
 if 'posicion_semanal' not in st.session_state:
     st.session_state['posicion_semanal'] = None
 
-# =========================================================
-# VISTA 1: RESUMEN CONSOLIDADO
-# =========================================================
 if seccion_activa == "Resumen Consolidado":
     col_dash_tit, col_dash_btn = st.columns([3, 1])
     with col_dash_tit:
         st.title("Consolidado General de Auditorías")
     with col_dash_btn:
         st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("Resetear Filtros", type="secondary", use_container_width=True):
+        if st.button("Resetear Filtros", type="secondary", use_container_width=True, icon=":material/filter_alt_off:"):
             for k in ["chart_linea_interactivo", "chart_barras_interactivo"]:
                 if k in st.session_state:
                     del st.session_state[k]
@@ -462,7 +439,7 @@ if seccion_activa == "Resumen Consolidado":
     df_dash = cargar_base_consolidada()
     
     if df_dash is None or df_dash.empty:
-        st.warning("No se pudo cargar la base consolidada desde Google Sheets. Revisa la URL y las credenciales.")
+        st.warning("No se pudo cargar la base consolidada.", icon=":material/warning:")
     else:
         df_dash['Stock auditado'] = pd.to_numeric(df_dash['Stock auditado'], errors='coerce').fillna(0)
         df_dash['Stock Octosis'] = pd.to_numeric(df_dash['Stock Octosis'], errors='coerce').fillna(0)
@@ -487,21 +464,16 @@ if seccion_activa == "Resumen Consolidado":
         obs_sel = st.session_state.get("combo_obs_dash", "Todas")
         
         df_dash_filtered = df_dash.copy()
-        filtro_aplicado_txt = []
         
         if filtro_click_semana:
             df_dash_filtered = df_dash_filtered[df_dash_filtered['Nombre del Archivo Origen'] == filtro_click_semana]
-            filtro_aplicado_txt.append(f"Semana: **{filtro_click_semana}**")
         elif sem_sel != "Todas":
             df_dash_filtered = df_dash_filtered[df_dash_filtered['Nombre del Archivo Origen'] == sem_sel]
-            filtro_aplicado_txt.append(f"Semana: **{sem_sel}**")
             
         if filtro_click_observacion:
             df_dash_filtered = df_dash_filtered[df_dash_filtered['Observaciones'] == filtro_click_observacion]
-            filtro_aplicado_txt.append(f"Observación: **{filtro_click_observacion}**")
         elif obs_sel != "Todas":
             df_dash_filtered = df_dash_filtered[df_dash_filtered['Observaciones'] == obs_sel]
-            filtro_aplicado_txt.append(f"Observación: **{obs_sel}**")
 
         total_auditorias = len(df_dash_filtered)
         ok_count = (df_dash_filtered['Resultado'] == 'OK').sum()
@@ -569,37 +541,27 @@ if seccion_activa == "Resumen Consolidado":
             else:
                 obs_list = ["Todas"]
             st.selectbox("Filtrar por Observación:", obs_list, key="combo_obs_dash")
-
-        if filtro_aplicado_txt:
-            st.info(f"Filtrando por: {', '.join(filtro_aplicado_txt)} (Total: **{len(df_dash_filtered)}** registros)")
             
         cols_dash = ['Nombre del Archivo Origen', 'Categoría', 'Código', 'Stock Octosis', 'Stock auditado', 'Diferencia', 'Resultado', 'Observaciones']
         cols_existentes = [c for c in cols_dash if c in df_dash_filtered.columns]
         df_mostrar_final = df_dash_filtered[cols_existentes].rename(columns={'Nombre del Archivo Origen': 'Semana'})
         st.dataframe(df_mostrar_final, use_container_width=True, hide_index=True)
 
-# =========================================================
-# VISTA 2: AUDITORÍA EN VIVO
-# =========================================================
 elif seccion_activa == "Auditoría Live":
-    
     st.title(f"Auditoría de {tipo_auditoria}")
     st.markdown("---")
     
     if tipo_auditoria == "Productos":
-        
         if df_inv is None:
-            st.info("Por favor, carga el archivo de inventario diario en la barra lateral para comenzar.")
+            st.info("Carga el archivo de inventario diario en la barra lateral para comenzar.", icon=":material/info:")
         else:
-            # --- SISTEMA DE RECUPERACIÓN DESDE LA NUBE ---
             if st.session_state['muestra_actual'].empty:
                 df_nube = cargar_borrador_nube()
                 if not df_nube.empty and 'Cod Sku' in df_nube.columns:
-                    st.warning("⚠️ Hay un borrador de auditoría inconcluso guardado en la nube.")
+                    st.warning("Se ha detectado un borrador de auditoría en la nube.", icon=":material/warning:")
                     c_n1, c_n2 = st.columns([1, 3])
                     with c_n1:
-                        if st.button("☁️ Recuperar Borrador", type="primary", use_container_width=True):
-                            # Casteo seguro
+                        if st.button("Recuperar Borrador", type="primary", use_container_width=True, icon=":material/cloud_download:"):
                             cols_texto = ['Cod Sku', 'Descripcion', col_posicion_inv, col_deposito_inv, 'Observaciones']
                             for c in cols_texto:
                                 if c in df_nube.columns:
@@ -611,7 +573,7 @@ elif seccion_activa == "Auditoría Live":
                             st.session_state['muestra_actual'] = df_nube
                             st.rerun()
                     with c_n2:
-                        if st.button("Descartar Borrador", type="secondary"):
+                        if st.button("Descartar Borrador", type="secondary", icon=":material/delete:"):
                             vaciar_borrador_nube()
                             st.rerun()
                     st.markdown("---")
@@ -628,7 +590,7 @@ elif seccion_activa == "Auditoría Live":
                 with f_col3:
                     tamano_muestra = st.number_input("Cantidad:", min_value=1, value=5, step=1)
                 
-                submit_agregar = st.form_submit_button("Agregar a la Muestra", type="primary", use_container_width=True)
+                submit_agregar = st.form_submit_button("Agregar a la Muestra", type="primary", use_container_width=True, icon=":material/add_circle:")
                 
                 if submit_agregar:
                     df_filtrado = df_base.copy()
@@ -652,10 +614,10 @@ elif seccion_activa == "Auditoría Live":
                         
                         guardar_borrador_nube(st.session_state['muestra_actual'])
                     else:
-                        st.warning("No hay más productos que coincidan con los filtros seleccionados.")
+                        st.warning("No hay más productos que coincidan con los filtros seleccionados.", icon=":material/warning:")
             
             if not st.session_state['muestra_actual'].empty:
-                if st.button("Limpiar Muestra / Cancelar", use_container_width=True):
+                if st.button("Limpiar Muestra", use_container_width=True, icon=":material/delete:"):
                     st.session_state['muestra_actual'] = pd.DataFrame()
                     vaciar_borrador_nube()
                     st.rerun()
@@ -684,13 +646,12 @@ elif seccion_activa == "Auditoría Live":
             with c_m3: st.markdown(f"""<div class="metric-card-soft"><div class="metric-card-soft-label">Diferencias</div><div class="metric-card-soft-val">{dif_reales}</div></div>""", unsafe_allow_html=True)
             
             with c_btn:
-                if st.button("🗺️ Mostrar Ruta y Cargar", type="primary", use_container_width=True):
+                if st.button("Mostrar Ruta y Cargar", type="primary", use_container_width=True, icon=":material/route:"):
                     mostrar_ruta_auditoria(st.session_state['muestra_actual'], col_posicion_inv, col_deposito_inv, col_stock_inv)
             
             st.markdown("<br>", unsafe_allow_html=True)
             
             with st.form("form_editor_auditoria"):
-                st.write("✏️ **Ingresa las cantidades y luego presiona 'Guardar Cambios' para actualizar los datos.**")
                 df_editado = st.data_editor(
                     df_recuento,
                     column_config={
@@ -709,20 +670,17 @@ elif seccion_activa == "Auditoría Live":
                 )
                 
                 c_g1, c_g2 = st.columns([1, 1])
-                with c_g1: btn_guardar_local = st.form_submit_button("💾 Guardar y Ver Métricas", type="secondary")
-                with c_g2: btn_guardar_nube = st.form_submit_button("☁️ Guardar en Nube (Borrador)", type="primary")
+                with c_g1: btn_guardar_local = st.form_submit_button("Guardar Local", icon=":material/save:", type="secondary")
+                with c_g2: btn_guardar_nube = st.form_submit_button("Guardar en Nube", icon=":material/cloud_sync:", type="primary")
                 
             if btn_guardar_local or btn_guardar_nube:
                 st.session_state['muestra_actual'] = df_editado
                 if btn_guardar_nube:
                     if guardar_borrador_nube(df_editado):
-                        st.success("Borrador guardado en Google Sheets con éxito.")
+                        st.success("Borrador guardado en Google Sheets.", icon=":material/check_circle:")
                 st.rerun()
             
-            if faltan_cargar > 0:
-                st.info(f"Falta ingresar el recuento físico de {faltan_cargar} posiciones para habilitar el reporte final.")
-            
-            if st.button("Generar Reporte Final", type="primary", disabled=(faltan_cargar > 0)):
+            if st.button("Generar Reporte Final", type="primary", icon=":material/assignment_turned_in:", disabled=(faltan_cargar > 0)):
                 stock_teorico = pd.to_numeric(df_editado[col_stock_inv], errors='coerce').fillna(0)
                 stock_fisico = pd.to_numeric(df_editado['Stock auditado'], errors='coerce').fillna(0)
                 df_editado['Diferencia'] = stock_fisico - stock_teorico
@@ -748,7 +706,7 @@ elif seccion_activa == "Auditoría Live":
 
     elif tipo_auditoria == "Posiciones":
         if df_inv is None:
-            st.info("Por favor, carga el archivo de inventario diario en la barra lateral para comenzar.")
+            st.info("Carga el archivo de inventario diario en la barra lateral para comenzar.", icon=":material/info:")
         else:
             st.write("Filtros de Ubicación")
             
@@ -766,7 +724,7 @@ elif seccion_activa == "Auditoría Live":
                 with f1: nivel_sel = st.selectbox("Nivel:", ["Todos"] + niveles_disponibles)
                 with f2: seccion_sel = st.selectbox("Pasillo / Sección:", ["Todos"] + secciones_disponibles)
                     
-                submit_pos = st.form_submit_button("Sustraer Posición Aleatoria", type="primary", use_container_width=True)
+                submit_pos = st.form_submit_button("Sustraer Posición Aleatoria", type="primary", use_container_width=True, icon=":material/my_location:")
                 
                 if submit_pos:
                     df_pos_filtrado = df_base[df_base['Nivel'].isin(['1', '2', '3'])].copy()
@@ -784,10 +742,10 @@ elif seccion_activa == "Auditoría Live":
                         pos_base_elegida = df_pos_filtrado.sample(1)['Posicion_Base'].values[0].strip()
                         st.session_state['posicion_semanal'] = pos_base_elegida
                     else:
-                        st.info("No hay posiciones con productos en el inventario para los filtros seleccionados.")
+                        st.info("No hay posiciones con productos en el inventario para los filtros seleccionados.", icon=":material/info:")
 
             if st.session_state['posicion_semanal'] is not None:
-                if st.button("Limpiar Selección", use_container_width=True):
+                if st.button("Limpiar Selección", use_container_width=True, icon=":material/delete:"):
                     st.session_state['posicion_semanal'] = None
                     st.rerun()
 
@@ -817,7 +775,6 @@ elif seccion_activa == "Auditoría Live":
                     cols_mostrar = ['Código', 'Descripcion', 'Estanteria_Clean', col_deposito_inv, col_stock_inv, 'Stock auditado', 'Observaciones']
                     cols_existentes = [c for c in cols_mostrar if c in productos_en_posicion.columns]
                     
-                    # --- SOLUCIÓN LAG APLICADA A POSICIONES ---
                     with st.form("form_posiciones_audit"):
                         df_editor_pos = st.data_editor(
                             productos_en_posicion[cols_existentes],
@@ -834,11 +791,11 @@ elif seccion_activa == "Auditoría Live":
                             hide_index=True,
                             key="editor_posicion_semanal"
                         )
-                        btn_pos_guardar = st.form_submit_button("💾 Actualizar Valores", type="secondary")
+                        btn_pos_guardar = st.form_submit_button("Actualizar Valores", icon=":material/save:", type="secondary")
                         
                     faltan_pos = df_editor_pos['Stock auditado'].isna().sum()
                     
-                    if st.button("Generar Reporte de Posición", type="primary", disabled=(faltan_pos > 0)):
+                    if st.button("Generar Reporte de Posición", type="primary", icon=":material/assignment_turned_in:", disabled=(faltan_pos > 0)):
                         st_teorico = pd.to_numeric(df_editor_pos[col_stock_inv], errors='coerce').fillna(0)
                         st_fisico = pd.to_numeric(df_editor_pos['Stock auditado'], errors='coerce').fillna(0)
                         df_editor_pos['Diferencia'] = st_fisico - st_teorico
@@ -857,8 +814,7 @@ elif seccion_activa == "Auditoría Live":
                         })
                         confirmar_e_impactar_consolidado(df_rep_pos)
                 else:
-                    st.info("No se registran productos en el inventario teórico para esta posición.")
+                    st.info("No se registran productos en el inventario teórico para esta posición.", icon=":material/info:")
 
     elif tipo_auditoria in ["Clientes", "Proveedores"]:
-        st.info("La lógica para este módulo se desarrollará próximamente.")
-        st.dataframe(df_base.head())
+        st.info("Módulo en desarrollo.", icon=":material/construction:")
