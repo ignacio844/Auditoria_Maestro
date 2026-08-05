@@ -181,11 +181,12 @@ def guardar_borrador_nube(df):
 def cargar_borrador_nube():
     try:
         conn = st.connection("gsheets", type=GSheetsConnection)
-        df = conn.read(spreadsheet=URL_GOOGLE_SHEETS, worksheet="Borradores")
+        # ttl=0 es la clave: le prohíbe a Streamlit usar la memoria caché para esta lectura
+        df = conn.read(spreadsheet=URL_GOOGLE_SHEETS, worksheet="Borradores", ttl=0)
         return df.dropna(how='all')
     except:
         return pd.DataFrame()
-
+        
 def vaciar_borrador_nube():
     try:
         conn = st.connection("gsheets", type=GSheetsConnection)
@@ -555,9 +556,11 @@ elif seccion_activa == "Auditoría Live":
         if df_inv is None:
             st.info("Carga el archivo de inventario diario en la barra lateral para comenzar.", icon=":material/info:")
         else:
+            # --- SISTEMA DE RECUPERACIÓN DESDE LA NUBE ---
             if st.session_state['muestra_actual'].empty:
                 df_nube = cargar_borrador_nube()
-                if not df_nube.empty and 'Cod Sku' in df_nube.columns:
+                # Quitamos la restricción estricta de nombres de columnas para que el botón aparezca siempre que haya datos
+                if not df_nube.empty:
                     st.warning("Se ha detectado un borrador de auditoría en la nube.", icon=":material/warning:")
                     c_n1, c_n2 = st.columns([1, 3])
                     with c_n1:
