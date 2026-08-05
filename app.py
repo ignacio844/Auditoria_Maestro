@@ -354,10 +354,10 @@ col_stock_inv = "Saldo"
 col_posicion_inv = "Estanteria"
 col_deposito_inv = "Deposito"
 
-ID_GOOGLE_DRIVE = "TU_ID_DE_GOOGLE_DRIVE_AQUI"
+ID_GOOGLE_DRIVE = "1cxjiOrp-3ze99r-bPTU1OVEGGOMkRABwWzgkIHpC1Nw"
 df_inv = None
 
-if ID_GOOGLE_DRIVE != "TU_ID_DE_GOOGLE_DRIVE_AQUI":
+if ID_GOOGLE_DRIVE != "1cxjiOrp-3ze99r-bPTU1OVEGGOMkRABwWzgkIHpC1Nw":
     try:
         url_drive = f'https://drive.google.com/uc?id={ID_GOOGLE_DRIVE}'
         df_inv_bruto = pd.read_excel(url_drive)
@@ -634,21 +634,31 @@ elif seccion_activa == "Auditoría Live":
             columnas_existentes = [col for col in columnas_edicion if col in df_recuento.columns]
             df_recuento = df_recuento[columnas_existentes]
             
+           # --- CÁLCULO DE MÉTRICAS (ESTÁTICAS) ---
             faltan_cargar = df_recuento['Stock auditado'].isna().sum()
             st_teorico_temp = pd.to_numeric(df_recuento[col_stock_inv], errors='coerce').fillna(0)
             st_fisico_temp = pd.to_numeric(df_recuento['Stock auditado'], errors='coerce')
             dif_reales = ((st_fisico_temp.notna()) & (st_fisico_temp != st_teorico_temp)).sum()
-
-            c_m1, c_m2, c_m3, c_btn = st.columns([1, 1, 1, 1.3])
             
-            with c_m1: st.markdown(f"""<div class="metric-card-soft"><div class="metric-card-soft-label">Posiciones a Auditar</div><div class="metric-card-soft-val">{len(df_recuento)}</div></div>""", unsafe_allow_html=True)
-            with c_m2: st.markdown(f"""<div class="metric-card-soft"><div class="metric-card-soft-label">Pendientes</div><div class="metric-card-soft-val">{faltan_cargar}</div></div>""", unsafe_allow_html=True)
-            with c_m3: st.markdown(f"""<div class="metric-card-soft"><div class="metric-card-soft-label">Diferencias</div><div class="metric-card-soft-val">{dif_reales}</div></div>""", unsafe_allow_html=True)
+            # NUEVO: Cálculo de códigos únicos
+            codigos_unicos = df_recuento['Cod Sku'].nunique()
+
+            # Ajustamos a 5 columnas (4 métricas + 1 botón)
+            c_m1, c_m2, c_m3, c_m4, c_btn = st.columns([1, 1, 1, 1, 1.4])
+            
+            with c_m1: 
+                st.markdown(f"""<div class="metric-card-soft"><div class="metric-card-soft-label">Posiciones</div><div class="metric-card-soft-val">{len(df_recuento)}</div></div>""", unsafe_allow_html=True)
+            with c_m2: 
+                st.markdown(f"""<div class="metric-card-soft"><div class="metric-card-soft-label">Códigos Únicos</div><div class="metric-card-soft-val">{codigos_unicos}</div></div>""", unsafe_allow_html=True)
+            with c_m3: 
+                st.markdown(f"""<div class="metric-card-soft"><div class="metric-card-soft-label">Pendientes</div><div class="metric-card-soft-val">{faltan_cargar}</div></div>""", unsafe_allow_html=True)
+            with c_m4: 
+                st.markdown(f"""<div class="metric-card-soft"><div class="metric-card-soft-label">Diferencias</div><div class="metric-card-soft-val">{dif_reales}</div></div>""", unsafe_allow_html=True)
             
             with c_btn:
                 if st.button("Mostrar Ruta y Cargar", type="primary", use_container_width=True, icon=":material/route:"):
                     mostrar_ruta_auditoria(st.session_state['muestra_actual'], col_posicion_inv, col_deposito_inv, col_stock_inv)
-            
+                    
             st.markdown("<br>", unsafe_allow_html=True)
             
             with st.form("form_editor_auditoria"):
