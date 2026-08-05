@@ -304,53 +304,16 @@ if seccion_activa == "Auditoría Live":
 else:
     tipo_auditoria = "Dashboard"
 
-# --- INVENTARIO DIARIO CON BLINDAJE ANTI-INACTIVIDAD ---
 st.sidebar.header("Inventario Diario")
 col_codigo_inv = "Código"
 col_stock_inv = "Saldo" 
 col_posicion_inv = "Estanteria"
 col_deposito_inv = "Deposito"
 
-archivo_inventario = st.sidebar.file_uploader("Sube el archivo de Stock (Excel/CSV):", type=["xlsx", "xls", "csv"], key="uploader_sidebar_global")
+ID_GOOGLE_DRIVE = "TU_ID_DE_GOOGLE_DRIVE_AQUI"
+df_inv = None
 
-RUTA_INV_TEMP = "backup_inventario_inactividad.csv"
-
-if archivo_inventario is not None:
-    if 'nombre_archivo_cargado' not in st.session_state or st.session_state['nombre_archivo_cargado'] != archivo_inventario.name:
-        try:
-            if archivo_inventario.name.endswith('.csv'):
-                df_inv_bruto = pd.read_csv(archivo_inventario)
-            else:
-                df_inv_bruto = pd.read_excel(archivo_inventario)
-            
-            df_inv = df_inv_bruto[~df_inv_bruto[col_deposito_inv].astype(str).str.contains('REV|EXT', case=False, na=False)]
-            
-            # Guardamos en RAM
-            st.session_state['inventario_cargado'] = df_inv
-            st.session_state['nombre_archivo_cargado'] = archivo_inventario.name
-            
-            # 🔥 MAGIA: Guardamos un clon en el disco duro por si se corta la sesión
-            df_inv.to_csv(RUTA_INV_TEMP, index=False)
-            
-            st.sidebar.success("Inventario procesado y blindado.")
-        except Exception as e:
-            st.sidebar.error(f"Error de lectura: {e}")
-            df_inv = None
-    else:
-        df_inv = st.session_state['inventario_cargado']
-else:
-    # Si la sesión se reinició por inactividad y el archivo desapareció del uploader:
-    if 'inventario_cargado' in st.session_state and not st.session_state['inventario_cargado'].empty:
-        df_inv = st.session_state['inventario_cargado']
-    elif os.path.exists(RUTA_INV_TEMP):
-        # 🔥 MAGIA: Rescatamos el clon del disco duro de forma invisible
-        df_inv = pd.read_csv(RUTA_INV_TEMP)
-        st.session_state['inventario_cargado'] = df_inv
-        st.sidebar.info("🔄 Inventario recuperado tras inactividad.")
-    else:
-        df_inv = None
-
-if ID_GOOGLE_DRIVE != "1cxjiOrp-3ze99r-bPTU1OVEGGOMkRABwWzgkIHpC1Nw":
+if ID_GOOGLE_DRIVE != "TU_ID_DE_GOOGLE_DRIVE_AQUI":
     try:
         url_drive = f'https://drive.google.com/uc?id={ID_GOOGLE_DRIVE}'
         df_inv_bruto = pd.read_excel(url_drive)
