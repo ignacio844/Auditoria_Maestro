@@ -14,7 +14,8 @@ st.set_page_config(page_title="Sistema de Auditoría de Inventario", layout="wid
 # =========================================================
 # CONFIGURACIÓN DE GOOGLE SHEETS
 # =========================================================
-URL_GOOGLE_SHEETS = "https://docs.google.com/spreadsheets/d/1cxjiOrp-3ze99r-bPTU1OVEGGOMkRABwWzgkIHpC1Nw/edit?gid=66321362#gid=66321362"
+# URL limpia sin los gid del final
+URL_GOOGLE_SHEETS = "https://docs.google.com/spreadsheets/d/1cxjiOrp-3ze99r-bPTU1OVEGGOMkRABwWzgkIHpC1Nw/edit"
 
 # --- ESTILOS VISUALES CORPORATIVOS ---
 st.markdown("""
@@ -265,13 +266,6 @@ def confirmar_e_impactar_consolidado(df_preparado):
                 st.cache_data.clear()
                 st.session_state['muestra_actual'] = pd.DataFrame()
                 
-                # Limpiamos el Backup local al finalizar con éxito
-                try:
-                    if os.path.exists("backup_auditoria_prod.csv"):
-                        os.remove("backup_auditoria_prod.csv")
-                except:
-                    pass
-                
                 st.success("¡Datos guardados e impactados con éxito en Google Sheets!")
                 st.rerun()
             except Exception as e:
@@ -353,6 +347,7 @@ elif 'inventario_cargado' in st.session_state:
     df_inv = st.session_state['inventario_cargado']
 else:
     df_inv = None
+
 archivos_auditoria = {
     "Productos": "Auditoría_Aleatoria_Productos.csv",
     "Posiciones": "Auditoría_Aleatoria_Posiciones.csv",
@@ -544,28 +539,6 @@ elif seccion_activa == "Auditoría Live":
             st.info("Por favor, carga el archivo de inventario diario en la barra lateral para comenzar.")
         else:
             
-            # --- SISTEMA DE BACKUP LOCAL ---
-            if os.path.exists("backup_auditoria_prod.csv") and st.session_state['muestra_actual'].empty:
-                st.info("⚠️ El sistema detectó que tienes una auditoría en pausa de una sesión anterior.")
-                if st.button("Recuperar Auditoría Pendiente", icon=":material/restore:", type="primary"):
-                    df_recuperado = pd.read_csv("backup_auditoria_prod.csv")
-                    
-                    # --- BLINDAJE DE TIPOS DE DATOS ---
-                    cols_texto = ['Cod Sku', 'Descripcion', col_posicion_inv, col_deposito_inv, 'Observaciones']
-                    for c in cols_texto:
-                        if c in df_recuperado.columns:
-                            # Forzamos a texto y limpiamos los falsos 'nan'
-                            df_recuperado[c] = df_recuperado[c].astype(str).replace('nan', '')
-                            
-                    if 'Stock auditado' in df_recuperado.columns:
-                        df_recuperado['Stock auditado'] = pd.to_numeric(df_recuperado['Stock auditado'], errors='coerce')
-                    if col_stock_inv in df_recuperado.columns:
-                        df_recuperado[col_stock_inv] = pd.to_numeric(df_recuperado[col_stock_inv], errors='coerce')
-                    # ----------------------------------
-                        
-                    st.session_state['muestra_actual'] = df_recuperado
-                    st.rerun()
-
             st.write("Filtros Aleatorios")
             with st.form("form_filtros_prod"):
                 f_col1, f_col2, f_col3 = st.columns(3)
@@ -599,20 +572,12 @@ elif seccion_activa == "Auditoría Live":
                             st.session_state['muestra_actual'] = cruce_inmediato
                         else:
                             st.session_state['muestra_actual'] = pd.concat([st.session_state['muestra_actual'], cruce_inmediato], ignore_index=True)
-                        
-                        # Actualiza el backup
-                        st.session_state['muestra_actual'].to_csv("backup_auditoria_prod.csv", index=False)
                     else:
                         st.warning("No hay más productos que coincidan con los filtros seleccionados.")
             
             if not st.session_state['muestra_actual'].empty:
                 if st.button("Limpiar Muestra / Cancelar", use_container_width=True):
                     st.session_state['muestra_actual'] = pd.DataFrame()
-                    try:
-                        if os.path.exists("backup_auditoria_prod.csv"):
-                            os.remove("backup_auditoria_prod.csv")
-                    except:
-                        pass
                     st.rerun()
 
         if not st.session_state['muestra_actual'].empty:
@@ -693,7 +658,6 @@ elif seccion_activa == "Auditoría Live":
                 
             if btn_guardar_cambios:
                 st.session_state['muestra_actual'] = df_editado
-                df_editado.to_csv("backup_auditoria_prod.csv", index=False)
                 st.rerun() # Fuerza a recalcular los carteles de arriba
             
             if faltan_cargar > 0:
