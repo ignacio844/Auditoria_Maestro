@@ -14,7 +14,7 @@ st.set_page_config(page_title="Sistema de Auditoría de Inventario", layout="wid
 # =========================================================
 # CONFIGURACIÓN DE GOOGLE SHEETS
 # =========================================================
-URL_GOOGLE_SHEETS = "https://docs.google.com/spreadsheets/d/1cxjiOrp-3ze99r-bPTU1OVEGGOMkRABwWzgKIHpC1Nw/edit"
+URL_GOOGLE_SHEETS = "https://docs.google.com/spreadsheets/d/1cxjiOrp-3ze99r-bPTU1OVEGGOMkRABwWzgkIHpC1Nw/edit?gid=66321362#gid=66321362"
 
 # --- ESTILOS VISUALES CORPORATIVOS ---
 st.markdown("""
