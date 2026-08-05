@@ -326,19 +326,33 @@ if ID_GOOGLE_DRIVE != "TU_ID_DE_GOOGLE_DRIVE_AQUI":
 archivo_inventario = st.sidebar.file_uploader("Sube el archivo de Stock (Excel/CSV):", type=["xlsx", "xls", "csv"], key="uploader_sidebar_global")
 
 if archivo_inventario is not None:
-    try:
-        if archivo_inventario.name.endswith('.csv'):
-            df_inv_bruto = pd.read_csv(archivo_inventario)
-        else:
-            df_inv_bruto = pd.read_excel(archivo_inventario)
-        df_inv = df_inv_bruto[~df_inv_bruto[col_deposito_inv].astype(str).str.contains('REV|EXT', case=False, na=False)]
-        st.session_state['inventario_cargado'] = df_inv
-        st.sidebar.success("Inventario cargado correctamente")
-    except Exception as e:
-        st.sidebar.error(f"Error de lectura: {e}")
+    # Verificamos si es el mismo archivo que ya cargamos antes para no volver a leerlo
+    if 'nombre_archivo_cargado' not in st.session_state or st.session_state['nombre_archivo_cargado'] != archivo_inventario.name:
+        try:
+            if archivo_inventario.name.endswith('.csv'):
+                df_inv_bruto = pd.read_csv(archivo_inventario)
+            else:
+                df_inv_bruto = pd.read_excel(archivo_inventario)
+            
+            # Limpiamos depósitos excluidos
+            df_inv = df_inv_bruto[~df_inv_bruto[col_deposito_inv].astype(str).str.contains('REV|EXT', case=False, na=False)]
+            
+            # Lo guardamos en la memoria segura
+            st.session_state['inventario_cargado'] = df_inv
+            st.session_state['nombre_archivo_cargado'] = archivo_inventario.name
+            st.sidebar.success("Inventario procesado con éxito.")
+            
+        except Exception as e:
+            st.sidebar.error(f"Error de lectura: {e}")
+            df_inv = None
+    else:
+        # Si ya lo había procesado, lo saca de la memoria al instante
+        df_inv = st.session_state['inventario_cargado']
+
 elif 'inventario_cargado' in st.session_state:
     df_inv = st.session_state['inventario_cargado']
-
+else:
+    df_inv = None
 archivos_auditoria = {
     "Productos": "Auditoría_Aleatoria_Productos.csv",
     "Posiciones": "Auditoría_Aleatoria_Posiciones.csv",
